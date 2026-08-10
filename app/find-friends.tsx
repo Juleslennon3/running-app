@@ -1,13 +1,15 @@
+import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TextInput } from 'react-native'
 
-import { FollowButton } from '../components/follow-button'
+import { UserRow } from '../components/user-row'
 import { useSession } from '../lib/auth-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../lib/theme'
 
 export default function FindFriendsScreen() {
 
+  const router = useRouter()
   const { session } = useSession()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -114,18 +116,13 @@ export default function FindFriendsScreen() {
       )}
 
       {searchResults.map((user) => (
-        <View key={user.id} style={styles.rowCard}>
-          <View style={styles.rowIcon}>
-            <Text style={styles.rowIconText}>{user.username?.[0]?.toUpperCase() ?? '?'}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowText}>{user.username}</Text>
-          </View>
-          <FollowButton
-            isFollowing={myFollowingIds.has(user.id)}
-            onPress={() => toggleFollow(user.id)}
-          />
-        </View>
+        <UserRow
+          key={user.id}
+          username={user.username}
+          isFollowing={myFollowingIds.has(user.id)}
+          onToggleFollow={() => toggleFollow(user.id)}
+          onPress={() => router.push(`/user/${user.id}`)}
+        />
       ))}
     </ScrollView>
   )
@@ -154,34 +151,5 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textSecondary,
     fontSize: 13,
-  },
-  rowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    gap: 12,
-  },
-  rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowIconText: {
-    color: colors.accent,
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  rowText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
   },
 })

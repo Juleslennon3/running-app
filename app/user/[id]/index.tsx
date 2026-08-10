@@ -1,101 +1,89 @@
-import { useFocusEffect, useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
-import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native'
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
-import { useSession } from '../../lib/auth-context'
-import { supabase } from '../../lib/supabase'
-import { colors } from '../../lib/theme'
+import { FollowButton } from '../../../components/follow-button'
+import { useSession } from '../../../lib/auth-context'
+import { supabase } from '../../../lib/supabase'
+import { colors } from '../../../lib/theme'
 
-export default function ProfileScreen() {
-
+export default function UserProfileScreen() {
+  const { id } = useLocalSearchParams()
   const router = useRouter()
-  const { session, signOut } = useSession()
+  const navigation = useNavigation()
+  const { session } = useSession()
+
   const [username, setUsername] = useState('')
-  const [myClubs, setMyClubs] = useState<any[]>([])
-  const [myRaces, setMyRaces] = useState<any[]>([])
+  const [clubs, setClubs] = useState<any[]>([])
+  const [races, setRaces] = useState<any[]>([])
   const [totalDistance, setTotalDistance] = useState(0)
   const [racesWon, setRacesWon] = useState(0)
   const [formResults, setFormResults] = useState<{ raceId: any; won: boolean }[]>([])
-
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
+  const [isFollowing, setIsFollowing] = useState(false)
+
+  const isOwnProfile = id === session?.user.id
 
   useEffect(() => {
-    if (session) {
+    if (id) {
       fetchProfile()
-      fetchMyClubs()
-      fetchMyRacesAndStats()
+      fetchClubs()
+      fetchRacesAndStats()
+      fetchFollowCounts()
+      fetchIsFollowing()
     }
-  }, [session])
+  }, [id, session])
 
-  useFocusEffect(
-    useCallback(() => {
-      if (session) {
-        fetchFollowCounts()
-      }
-    }, [session])
-  )
-
-  async function fetchFollowCounts() {
-    const [{ count: followers }, { count: following }] = await Promise.all([
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', session?.user.id),
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', session?.user.id),
-    ])
-
-    setFollowerCount(followers ?? 0)
-    setFollowingCount(following ?? 0)
-  }
+  useEffect(() => {
+    if (username) {
+      navigation.setOptions({ title: username })
+    }
+  }, [username])
 
   async function fetchProfile() {
     const { data, error } = await supabase
       .from('profiles')
       .select('username')
-      .eq('id', session?.user.id)
+      .eq('id', id)
       .single()
 
-    console.log("PROFILE DATA:", data)
-    console.log("PROFILE ERROR:", error)
+    console.log("USER PROFILE:", data)
+    console.log("USER PROFILE ERROR:", error)
 
     if (!error && data) {
       setUsername(data.username)
     }
   }
 
-  async function fetchMyClubs() {
+  async function fetchClubs() {
     const { data, error } = await supabase
       .from('club_members')
       .select('club_id, clubs(id, name)')
-      .eq('user_id', session?.user.id)
+      .eq('user_id', id)
 
-    console.log("PROFILE MY CLUBS:", data)
+    console.log("USER CLUBS:", data)
+    console.log("USER CLUBS ERROR:", error)
 
     if (!error && data) {
-      setMyClubs(data.map((row: any) => row.clubs))
+      setClubs(data.map((row: any) => row.clubs))
     }
   }
 
-  async function fetchMyRacesAndStats() {
+  async function fetchRacesAndStats() {
     const { data: participations, error } = await supabase
       .from('race_participants')
       .select('distance_km, race_id, races(id, name, end_date)')
-      .eq('user_id', session?.user.id)
+      .eq('user_id', id)
 
-    console.log("MY RACE PARTICIPATIONS:", participations)
-    console.log("MY RACE PARTICIPATIONS ERROR:", error)
+    console.log("USER RACE PARTICIPATIONS:", participations)
+    console.log("USER RACE PARTICIPATIONS ERROR:", error)
 
     if (error || !participations) return
 
-    setMyRaces(participations)
+    setRaces(participations)
 
-    const total = participations.reduce((sum, row: any) => {
-      return sum + (row.distance_km ?? 0)
-    }, 0)
+    const total = participations.reduce((sum, row: any) => sum + (row.distance_km ?? 0), 0)
     setTotalDistance(total)
 
     const completedRaces = (participations as any[])
@@ -115,7 +103,7 @@ export default function ProfileScreen() {
         .order('distance_km', { ascending: false })
 
       const topFinisher = allParticipants?.[0]
-      const won = !!(topFinisher && topFinisher.user_id === session?.user.id && topFinisher.distance_km)
+      const won = !!(topFinisher && topFinisher.user_id === id && topFinisher.distance_km)
 
       if (won) wins++
       results.push({ raceId: race.id, won })
@@ -125,7 +113,57 @@ export default function ProfileScreen() {
     setFormResults(results.slice(-5))
   }
 
-  if (!session) return null
+  async function fetchFollowCounts() {
+    const [{ count: followers }, { count: following }] = await Promise.all([
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', id),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', id),
+    ])
+
+    setFollowerCount(followers ?? 0)
+    setFollowingCount(following ?? 0)
+  }
+
+  async function fetchIsFollowing() {
+    if (isOwnProfile) return
+
+    const { data } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('follower_id', session?.user.id)
+      .eq('following_id', id)
+      .maybeSingle()
+
+    setIsFollowing(!!data)
+  }
+
+  async function toggleFollow() {
+    const currentlyFollowing = isFollowing
+
+    setIsFollowing(!currentlyFollowing)
+    setFollowerCount((prev) => prev + (currentlyFollowing ? -1 : 1))
+
+    if (currentlyFollowing) {
+      const { error } = await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', session?.user.id)
+        .eq('following_id', id)
+
+      if (error) {
+        setIsFollowing(true)
+        setFollowerCount((prev) => prev + 1)
+      }
+    } else {
+      const { error } = await supabase
+        .from('follows')
+        .insert({ follower_id: session?.user.id, following_id: id })
+
+      if (error) {
+        setIsFollowing(false)
+        setFollowerCount((prev) => prev - 1)
+      }
+    }
+  }
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
@@ -138,30 +176,24 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.profileInfo}>
           <Text style={styles.title}>{username || 'Runner'}</Text>
-          <Text style={styles.email}>{session.user.email}</Text>
           <View style={styles.followRow}>
-            <TouchableOpacity onPress={() => router.push(`/user/${session.user.id}/followers`)}>
+            <TouchableOpacity onPress={() => router.push(`/user/${id}/followers`)}>
               <Text style={styles.followStat}>
                 <Text style={styles.followNumber}>{followerCount}</Text> followers
               </Text>
             </TouchableOpacity>
             <Text style={styles.followSep}>·</Text>
-            <TouchableOpacity onPress={() => router.push(`/user/${session.user.id}/following`)}>
+            <TouchableOpacity onPress={() => router.push(`/user/${id}/following`)}>
               <Text style={styles.followStat}>
                 <Text style={styles.followNumber}>{followingCount}</Text> following
               </Text>
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
-          <Text style={styles.logoutButtonText}>Log out</Text>
-        </TouchableOpacity>
+        {!isOwnProfile && (
+          <FollowButton isFollowing={isFollowing} onPress={toggleFollow} />
+        )}
       </View>
-
-      <TouchableOpacity style={styles.findPeopleRow} onPress={() => router.push('/find-friends')}>
-        <Text style={styles.findPeopleText}>Find people</Text>
-        <Text style={styles.findPeopleArrow}>›</Text>
-      </TouchableOpacity>
 
       <View style={styles.statsCard}>
         <View style={styles.statBox}>
@@ -175,7 +207,7 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statBox}>
-          <Text style={styles.statNumber}>{myRaces.length}</Text>
+          <Text style={styles.statNumber}>{races.length}</Text>
           <Text style={styles.statLabel}>races run</Text>
         </View>
       </View>
@@ -198,11 +230,11 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Your clubs</Text>
-      {myClubs.length === 0 && (
-        <Text style={styles.emptyText}>You haven't joined any clubs yet.</Text>
+      <Text style={styles.sectionTitle}>Clubs</Text>
+      {clubs.length === 0 && (
+        <Text style={styles.emptyText}>Not in any clubs yet.</Text>
       )}
-      {myClubs.map((club) => (
+      {clubs.map((club) => (
         <View key={club.id} style={styles.rowCard}>
           <View style={styles.rowIcon}>
             <Text style={styles.rowIconText}>{club.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -211,11 +243,11 @@ export default function ProfileScreen() {
         </View>
       ))}
 
-      <Text style={styles.sectionTitle}>Your races</Text>
-      {myRaces.length === 0 && (
-        <Text style={styles.emptyText}>You haven't joined any races yet.</Text>
+      <Text style={styles.sectionTitle}>Races</Text>
+      {races.length === 0 && (
+        <Text style={styles.emptyText}>No races yet.</Text>
       )}
-      {myRaces.map((row: any, index) => (
+      {races.map((row: any, index) => (
         <View key={index} style={styles.rowCard}>
           <View style={styles.rowIcon}>
             <Text style={styles.rowIconText}>{row.races?.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -239,7 +271,7 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 28,
-    paddingTop: 70,
+    paddingTop: 20,
     paddingBottom: 60,
   },
   profileHeader: {
@@ -266,27 +298,10 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
   },
-  logoutButton: {
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  logoutButtonText: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
     color: colors.textPrimary,
-  },
-  email: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
   followRow: {
     flexDirection: 'row',
@@ -304,27 +319,6 @@ const styles = StyleSheet.create({
   },
   followSep: {
     fontSize: 13,
-    color: colors.textSecondary,
-  },
-  findPeopleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  findPeopleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  findPeopleArrow: {
-    fontSize: 18,
     color: colors.textSecondary,
   },
   statsCard: {

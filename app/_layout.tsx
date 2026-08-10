@@ -8,10 +8,6 @@ import { AppSplashScreen } from '@/components/app-splash-screen';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SessionProvider, useSession } from '@/lib/auth-context';
 
-export const unstable_settings = {
-anchor: '(tabs)',
-};
-
 const MIN_SPLASH_MS = 1200;
 
 export default function RootLayout() {
@@ -44,6 +40,7 @@ return (
 <Stack.Screen name="club/[id]" options={{ title: 'Club', headerShown: true }} />
 <Stack.Screen name="race/[id]" options={{ title: 'Race', headerShown: true }} />
 <Stack.Screen name="find-friends" options={{ title: 'Find People', headerShown: true }} />
+<Stack.Screen name="invites" options={{ title: 'Race Invites', headerShown: true }} />
 <Stack.Screen name="user/[id]/index" options={{ title: 'Profile', headerShown: true }} />
 <Stack.Screen name="user/[id]/followers" options={{ title: 'Followers', headerShown: true }} />
 <Stack.Screen name="user/[id]/following" options={{ title: 'Following', headerShown: true }} />

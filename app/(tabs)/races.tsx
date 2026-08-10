@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { useCallback, useEffect, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Modal,
@@ -36,13 +36,61 @@ export default function RacesScreen() {
   const [searchQuery, setSearchQuery] = useState('')
   const [participantCounts, setParticipantCounts] = useState<{ [raceId: string]: number }>({})
   const [creatorNames, setCreatorNames] = useState<{ [userId: string]: string }>({})
+  const [myFollowing, setMyFollowing] = useState<any[]>([])
+  const [selectedInviteeIds, setSelectedInviteeIds] = useState<Set<string>>(new Set())
+  const [pendingInviteCount, setPendingInviteCount] = useState(0)
 
   useEffect(() => {
     if (session) {
       fetchRaces()
       fetchMyClubs()
+      fetchMyFollowing()
     }
   }, [session])
+
+  useFocusEffect(
+    useCallback(() => {
+      if (session) {
+        fetchPendingInviteCount()
+      }
+    }, [session])
+  )
+
+  async function fetchMyFollowing() {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('following_id, profiles!follows_following_id_fkey(username)')
+      .eq('follower_id', session?.user.id)
+
+    console.log("MY FOLLOWING (for invites):", data)
+    console.log("MY FOLLOWING ERROR:", error)
+
+    if (!error && data) {
+      setMyFollowing(data.map((row: any) => ({ id: row.following_id, username: row.profiles?.username ?? 'Unknown' })))
+    }
+  }
+
+  async function fetchPendingInviteCount() {
+    const { count, error } = await supabase
+      .from('race_invites')
+      .select('*', { count: 'exact', head: true })
+      .eq('invited_user_id', session?.user.id)
+      .eq('status', 'pending')
+
+    console.log("PENDING INVITE COUNT ERROR:", error)
+
+    if (!error) {
+      setPendingInviteCount(count ?? 0)
+    }
+  }
+
+  function toggleInvitee(userId: string) {
+    setSelectedInviteeIds((prev) => {
+      const next = new Set(prev)
+      next.has(userId) ? next.delete(userId) : next.add(userId)
+      return next
+    })
+  }
 
   async function fetchRaces() {
     const { data, error } = await supabase
@@ -140,19 +188,37 @@ export default function RacesScreen() {
         end_date: endDate.toISOString(),
         club_id: selectedClubId,
       })
+      .select()
+      .single()
 
     console.log("RACE DATA:", data)
     console.log("RACE ERROR:", error)
 
     if (error) {
       setMessage(error.message)
-    } else {
-      setMessage('Race created!')
-      setRaceName('')
-      setSelectedClubId(null)
-      setModalVisible(false)
-      fetchRaces()
+      return
     }
+
+    if (selectedInviteeIds.size > 0) {
+      const { error: inviteError } = await supabase
+        .from('race_invites')
+        .insert(
+          [...selectedInviteeIds].map((userId) => ({
+            race_id: data.id,
+            invited_user_id: userId,
+            invited_by: session?.user.id,
+          }))
+        )
+
+      console.log("RACE INVITES ERROR:", inviteError)
+    }
+
+    setMessage('Race created!')
+    setRaceName('')
+    setSelectedClubId(null)
+    setSelectedInviteeIds(new Set())
+    setModalVisible(false)
+    fetchRaces()
   }
 
   function getRaceStatus(endDate: string) {
@@ -219,6 +285,15 @@ export default function RacesScreen() {
         </TouchableOpacity>
       </View>
 
+      {pendingInviteCount > 0 && (
+        <TouchableOpacity style={styles.inviteBadge} onPress={() => router.push('/invites')}>
+          <Text style={styles.inviteBadgeText}>
+            {pendingInviteCount} race {pendingInviteCount === 1 ? 'invite' : 'invites'}
+          </Text>
+          <Text style={styles.inviteBadgeArrow}>›</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.filterRow}>
         {FILTER_OPTIONS.map((option) => (
           <TouchableOpacity
@@ -264,6 +339,7 @@ export default function RacesScreen() {
           style={styles.modalOverlay}
         >
           <View style={styles.modalContent}>
+          <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>New race</Text>
 
             <TextInput
@@ -297,6 +373,25 @@ export default function RacesScreen() {
               ))}
             </View>
 
+            <Text style={styles.modalLabel}>Invite friends (optional)</Text>
+            {myFollowing.length === 0 ? (
+              <Text style={styles.emptyText}>Follow people to invite them to races.</Text>
+            ) : (
+              <View style={styles.clubPickerRow}>
+                {myFollowing.map((friend) => (
+                  <TouchableOpacity
+                    key={friend.id}
+                    style={[styles.chip, selectedInviteeIds.has(friend.id) && styles.chipActive]}
+                    onPress={() => toggleInvitee(friend.id)}
+                  >
+                    <Text style={[styles.chipText, selectedInviteeIds.has(friend.id) && styles.chipTextActive]}>
+                      {friend.username}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <TouchableOpacity style={styles.primaryButton} onPress={createRace}>
               <Text style={styles.primaryButtonText}>Create race (3 day window)</Text>
             </TouchableOpacity>
@@ -304,6 +399,7 @@ export default function RacesScreen() {
             <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
+          </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -320,6 +416,21 @@ const styles = StyleSheet.create({
   createButton: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16 },
   createButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 13 },
   message: { color: colors.textSecondary, fontSize: 13, marginBottom: 16 },
+  inviteBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    borderWidth: 0.5,
+    borderColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 14,
+  },
+  inviteBadgeText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
+  inviteBadgeArrow: { fontSize: 18, color: colors.accent },
+  emptyText: { color: colors.textSecondary, fontSize: 13, marginBottom: 10 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   searchInput: {
     backgroundColor: colors.card,
@@ -351,7 +462,7 @@ const styles = StyleSheet.create({
   badgeEnded: { backgroundColor: colors.background, borderRadius: 20, paddingVertical: 4, paddingHorizontal: 10 },
   badgeEndedText: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 },
+  modalContent: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, maxHeight: '85%' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 18 },
   modalLabel: { fontSize: 13, color: colors.textSecondary, marginBottom: 10 },
   input: { backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 18, color: colors.textPrimary, fontSize: 15 },

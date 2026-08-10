@@ -4,6 +4,8 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { FollowButton } from '../../../components/follow-button'
 import { useSession } from '../../../lib/auth-context'
+import { followUser, unfollowUser } from '../../../lib/follow'
+import { getLevelLabel } from '../../../lib/level'
 import { supabase } from '../../../lib/supabase'
 import { colors } from '../../../lib/theme'
 
@@ -142,26 +144,14 @@ export default function UserProfileScreen() {
     setIsFollowing(!currentlyFollowing)
     setFollowerCount((prev) => prev + (currentlyFollowing ? -1 : 1))
 
-    if (currentlyFollowing) {
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('follower_id', session?.user.id)
-        .eq('following_id', id)
+    const targetId = Array.isArray(id) ? id[0] : id
+    const { error } = currentlyFollowing
+      ? await unfollowUser(session!.user.id, targetId)
+      : await followUser(session!.user.id, targetId)
 
-      if (error) {
-        setIsFollowing(true)
-        setFollowerCount((prev) => prev + 1)
-      }
-    } else {
-      const { error } = await supabase
-        .from('follows')
-        .insert({ follower_id: session?.user.id, following_id: id })
-
-      if (error) {
-        setIsFollowing(false)
-        setFollowerCount((prev) => prev - 1)
-      }
+    if (error) {
+      setIsFollowing(currentlyFollowing)
+      setFollowerCount((prev) => prev + (currentlyFollowing ? 1 : -1))
     }
   }
 
@@ -176,6 +166,9 @@ export default function UserProfileScreen() {
         </View>
         <View style={styles.profileInfo}>
           <Text style={styles.title}>{username || 'Runner'}</Text>
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelBadgeText}>{getLevelLabel(totalDistance)}</Text>
+          </View>
           <View style={styles.followRow}>
             <TouchableOpacity onPress={() => router.push(`/user/${id}/followers`)}>
               <Text style={styles.followStat}>
@@ -302,6 +295,19 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: colors.textPrimary,
+  },
+  levelBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1c2b12',
+    borderRadius: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    marginTop: 6,
+  },
+  levelBadgeText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
   },
   followRow: {
     flexDirection: 'row',

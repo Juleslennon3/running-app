@@ -6,6 +6,7 @@ import {
     Platform,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -39,6 +40,7 @@ export default function RacesScreen() {
   const [myFollowing, setMyFollowing] = useState<any[]>([])
   const [selectedInviteeIds, setSelectedInviteeIds] = useState<Set<string>>(new Set())
   const [pendingInviteCount, setPendingInviteCount] = useState(0)
+  const [autoJoin, setAutoJoin] = useState(true)
 
   useEffect(() => {
     if (session) {
@@ -187,6 +189,7 @@ export default function RacesScreen() {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         club_id: selectedClubId,
+        is_private: selectedInviteeIds.size > 0,
       })
       .select()
       .single()
@@ -200,10 +203,12 @@ export default function RacesScreen() {
     }
 
     if (selectedInviteeIds.size > 0) {
+      const inviteeIds = [...selectedInviteeIds]
+
       const { error: inviteError } = await supabase
         .from('race_invites')
         .insert(
-          [...selectedInviteeIds].map((userId) => ({
+          inviteeIds.map((userId) => ({
             race_id: data.id,
             invited_user_id: userId,
             invited_by: session?.user.id,
@@ -211,12 +216,34 @@ export default function RacesScreen() {
         )
 
       console.log("RACE INVITES ERROR:", inviteError)
+
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert(
+          inviteeIds.map((userId) => ({
+            user_id: userId,
+            actor_id: session?.user.id,
+            type: 'race_invite',
+            race_id: data.id,
+          }))
+        )
+
+      console.log("RACE INVITE NOTIFICATIONS ERROR:", notificationError)
+    }
+
+    if (autoJoin) {
+      const { error: joinError } = await supabase
+        .from('race_participants')
+        .insert({ race_id: data.id, user_id: session?.user.id })
+
+      console.log("AUTO-JOIN ERROR:", joinError)
     }
 
     setMessage('Race created!')
     setRaceName('')
     setSelectedClubId(null)
     setSelectedInviteeIds(new Set())
+    setAutoJoin(true)
     setModalVisible(false)
     fetchRaces()
   }
@@ -392,6 +419,16 @@ export default function RacesScreen() {
               </View>
             )}
 
+            <View style={styles.joinToggleRow}>
+              <Text style={styles.modalLabel}>Join this race</Text>
+              <Switch
+                value={autoJoin}
+                onValueChange={setAutoJoin}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.textPrimary}
+              />
+            </View>
+
             <TouchableOpacity style={styles.primaryButton} onPress={createRace}>
               <Text style={styles.primaryButtonText}>Create race (3 day window)</Text>
             </TouchableOpacity>
@@ -465,6 +502,12 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, maxHeight: '85%' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 18 },
   modalLabel: { fontSize: 13, color: colors.textSecondary, marginBottom: 10 },
+  joinToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   input: { backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 18, color: colors.textPrimary, fontSize: 15 },
   clubPickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   chip: { borderWidth: 0.5, borderColor: colors.border, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14 },

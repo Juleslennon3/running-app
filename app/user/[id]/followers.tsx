@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text } from 'react-native'
 
 import { UserRow } from '../../../components/user-row'
 import { useSession } from '../../../lib/auth-context'
+import { followUser, unfollowUser } from '../../../lib/follow'
 import { supabase } from '../../../lib/supabase'
 import { colors } from '../../../lib/theme'
 
@@ -55,28 +56,16 @@ export default function FollowersScreen() {
       return next
     })
 
-    if (currentlyFollowing) {
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('follower_id', session?.user.id)
-        .eq('following_id', targetId)
+    const { error } = currentlyFollowing
+      ? await unfollowUser(session!.user.id, targetId)
+      : await followUser(session!.user.id, targetId)
 
-      if (error) {
-        setMyFollowingIds((prev) => new Set(prev).add(targetId))
-      }
-    } else {
-      const { error } = await supabase
-        .from('follows')
-        .insert({ follower_id: session?.user.id, following_id: targetId })
-
-      if (error) {
-        setMyFollowingIds((prev) => {
-          const next = new Set(prev)
-          next.delete(targetId)
-          return next
-        })
-      }
+    if (error) {
+      setMyFollowingIds((prev) => {
+        const next = new Set(prev)
+        currentlyFollowing ? next.add(targetId) : next.delete(targetId)
+        return next
+      })
     }
   }
 

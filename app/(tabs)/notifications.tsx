@@ -2,9 +2,9 @@ import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
-import { useSession } from '../lib/auth-context'
-import { supabase } from '../lib/supabase'
-import { colors } from '../lib/theme'
+import { useSession } from '../../lib/auth-context'
+import { supabase } from '../../lib/supabase'
+import { colors } from '../../lib/theme'
 
 export default function NotificationsScreen() {
   const router = useRouter()
@@ -59,8 +59,12 @@ export default function NotificationsScreen() {
     }
   }
 
+  if (!session) return null
+
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Notifications</Text>
+
       {notifications.length === 0 && (
         <Text style={styles.emptyText}>No notifications yet.</Text>
       )}
@@ -95,8 +99,14 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 28,
-    paddingTop: 20,
+    paddingTop: 70,
     paddingBottom: 60,
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: 20,
   },
   emptyText: {
     color: colors.textSecondary,

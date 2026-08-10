@@ -26,7 +26,6 @@ export default function ProfileScreen() {
 
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
 
   useEffect(() => {
     if (session) {
@@ -40,7 +39,6 @@ export default function ProfileScreen() {
     useCallback(() => {
       if (session) {
         fetchFollowCounts()
-        fetchUnreadNotificationCount()
       }
     }, [session])
   )
@@ -53,20 +51,6 @@ export default function ProfileScreen() {
 
     setFollowerCount(followers ?? 0)
     setFollowingCount(following ?? 0)
-  }
-
-  async function fetchUnreadNotificationCount() {
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', session?.user.id)
-      .eq('is_read', false)
-
-    console.log("UNREAD NOTIFICATION COUNT ERROR:", error)
-
-    if (!error) {
-      setUnreadNotificationCount(count ?? 0)
-    }
   }
 
   async function fetchProfile() {
@@ -177,23 +161,6 @@ export default function ProfileScreen() {
           <Text style={styles.logoutButtonText}>Log out</Text>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.findPeopleRow} onPress={() => router.push('/notifications')}>
-        <Text style={styles.findPeopleText}>Notifications</Text>
-        <View style={styles.findPeopleRight}>
-          {unreadNotificationCount > 0 && (
-            <View style={styles.notificationCountBadge}>
-              <Text style={styles.notificationCountText}>{unreadNotificationCount}</Text>
-            </View>
-          )}
-          <Text style={styles.findPeopleArrow}>›</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.findPeopleRow} onPress={() => router.push('/find-friends')}>
-        <Text style={styles.findPeopleText}>Find people</Text>
-        <Text style={styles.findPeopleArrow}>›</Text>
-      </TouchableOpacity>
 
       <View style={styles.statsCard}>
         <View style={styles.statBox}>
@@ -350,46 +317,6 @@ const styles = StyleSheet.create({
   followSep: {
     fontSize: 13,
     color: colors.textSecondary,
-  },
-  findPeopleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  findPeopleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  findPeopleArrow: {
-    fontSize: 18,
-    color: colors.textSecondary,
-  },
-  findPeopleRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  notificationCountBadge: {
-    backgroundColor: colors.accent,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-  },
-  notificationCountText: {
-    color: colors.background,
-    fontSize: 11,
-    fontWeight: 'bold',
   },
   statsCard: {
     flexDirection: 'row',

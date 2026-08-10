@@ -39,9 +39,7 @@ return (
 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 <Stack.Screen name="club/[id]" options={{ title: 'Club', headerShown: true }} />
 <Stack.Screen name="race/[id]" options={{ title: 'Race', headerShown: true }} />
-<Stack.Screen name="find-friends" options={{ title: 'Find People', headerShown: true }} />
 <Stack.Screen name="invites" options={{ title: 'Race Invites', headerShown: true }} />
-<Stack.Screen name="notifications" options={{ title: 'Notifications', headerShown: true }} />
 <Stack.Screen name="user/[id]/index" options={{ title: 'Profile', headerShown: true }} />
 <Stack.Screen name="user/[id]/followers" options={{ title: 'Followers', headerShown: true }} />
 <Stack.Screen name="user/[id]/following" options={{ title: 'Following', headerShown: true }} />

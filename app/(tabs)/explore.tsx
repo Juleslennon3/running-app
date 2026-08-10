@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
   ScrollView,
@@ -8,25 +9,63 @@ import {
   View
 } from 'react-native'
 
-import { useRouter } from 'expo-router'
+import { UserRow } from '../../components/user-row'
 import { useSession } from '../../lib/auth-context'
+import { followUser, unfollowUser } from '../../lib/follow'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../lib/theme'
+
+const CATEGORIES: { key: 'clubs' | 'races' | 'people'; label: string }[] = [
+  { key: 'clubs', label: 'Clubs' },
+  { key: 'races', label: 'Races' },
+  { key: 'people', label: 'People' },
+]
+
 export default function ExploreScreen() {
 
   const { session } = useSession()
+  const router = useRouter()
+  const [category, setCategory] = useState<'clubs' | 'races' | 'people'>('clubs')
+  const [searchQuery, setSearchQuery] = useState('')
   const [message, setMessage] = useState('')
+
+  // Clubs
   const [clubName, setClubName] = useState('')
   const [clubs, setClubs] = useState<any[]>([])
   const [myClubIds, setMyClubIds] = useState<string[]>([])
-  const router = useRouter()
+
+  // Races
+  const [openRaces, setOpenRaces] = useState<any[]>([])
+
+  // People
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [myFollowingIds, setMyFollowingIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (session) {
       fetchClubs()
       fetchMyMemberships()
+      fetchOpenRaces()
+      fetchMyFollowingIds()
     }
   }, [session])
+
+  useEffect(() => {
+    if (category !== 'people') return
+
+    const query = searchQuery.trim()
+
+    if (query.length === 0) {
+      setSearchResults([])
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      searchProfiles(query)
+    }, 300)
+
+    return () => clearTimeout(timeout)
+  }, [searchQuery, category, session])
 
   async function fetchClubs() {
     const { data, error } = await supabase
@@ -98,63 +137,213 @@ export default function ExploreScreen() {
     }
   }
 
+  async function fetchOpenRaces() {
+    const { data, error } = await supabase
+      .from('races')
+      .select('*, clubs(name)')
+      .eq('is_private', false)
+      .order('start_date', { ascending: true })
+
+    console.log("FETCH OPEN RACES DATA:", data)
+    console.log("FETCH OPEN RACES ERROR:", error)
+
+    if (!error && data) {
+      setOpenRaces(data)
+    }
+  }
+
+  async function fetchMyFollowingIds() {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', session?.user.id)
+
+    if (!error && data) {
+      setMyFollowingIds(new Set(data.map((row: any) => row.following_id)))
+    }
+  }
+
+  async function searchProfiles(query: string) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .ilike('username', `%${query}%`)
+      .neq('id', session?.user.id)
+      .limit(20)
+
+    console.log("SEARCH PROFILES:", data)
+    console.log("SEARCH PROFILES ERROR:", error)
+
+    if (!error && data) {
+      setSearchResults(data)
+    }
+  }
+
+  async function toggleFollow(targetId: string) {
+    const currentlyFollowing = myFollowingIds.has(targetId)
+
+    setMyFollowingIds((prev) => {
+      const next = new Set(prev)
+      currentlyFollowing ? next.delete(targetId) : next.add(targetId)
+      return next
+    })
+
+    const { error } = currentlyFollowing
+      ? await unfollowUser(session!.user.id, targetId)
+      : await followUser(session!.user.id, targetId)
+
+    if (error) {
+      setMyFollowingIds((prev) => {
+        const next = new Set(prev)
+        currentlyFollowing ? next.add(targetId) : next.delete(targetId)
+        return next
+      })
+    }
+  }
+
+  function getRaceStatus(endDate: string) {
+    const now = new Date()
+    const end = new Date(endDate)
+    return now < end ? 'Active' : 'Ended'
+  }
+
   if (!session) return null
+
+  const filteredClubs = clubs.filter((c) =>
+    c.name?.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  )
+
+  const filteredRaces = openRaces
+    .filter((r) => getRaceStatus(r.end_date) === 'Active')
+    .filter((r) => r.name?.toLowerCase().includes(searchQuery.trim().toLowerCase()))
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Clubs</Text>
-      <Text style={styles.subtitle}>{clubs.length} clubs to join</Text>
+      <Text style={styles.title}>Explore</Text>
 
-      <View style={styles.createRow}>
-        <TextInput
-          placeholder="New club name"
-          placeholderTextColor={colors.textSecondary}
-          value={clubName}
-          onChangeText={setClubName}
-          style={styles.input}
-        />
-        <TouchableOpacity style={styles.createButton} onPress={createClub}>
-          <Text style={styles.createButtonText}>Create</Text>
-        </TouchableOpacity>
+      <View style={styles.categoryRow}>
+        {CATEGORIES.map((option) => (
+          <TouchableOpacity
+            key={option.key}
+            style={[styles.chip, category === option.key && styles.chipActive]}
+            onPress={() => setCategory(option.key)}
+          >
+            <Text style={[styles.chipText, category === option.key && styles.chipTextActive]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
+
+      <TextInput
+        placeholder={`Search ${category}`}
+        placeholderTextColor={colors.textSecondary}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        style={styles.searchInput}
+        autoCapitalize="none"
+      />
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
-      {clubs.map((club) => {
-  const alreadyJoined = myClubIds.includes(club.id)
+      {category === 'clubs' && (
+        <>
+          <View style={styles.createRow}>
+            <TextInput
+              placeholder="New club name"
+              placeholderTextColor={colors.textSecondary}
+              value={clubName}
+              onChangeText={setClubName}
+              style={styles.input}
+            />
+            <TouchableOpacity style={styles.createButton} onPress={createClub}>
+              <Text style={styles.createButtonText}>Create</Text>
+            </TouchableOpacity>
+          </View>
 
-  return (
-    <TouchableOpacity
-      key={club.id}
-      style={styles.clubCard}
-      onPress={() => router.push(`/club/${club.id}`)}
-    >
-      <View style={styles.clubIcon}>
-        <Text style={styles.clubIconText}>
-          {club.name?.[0]?.toUpperCase() ?? '?'}
-        </Text>
-      </View>
+          {filteredClubs.map((club) => {
+            const alreadyJoined = myClubIds.includes(club.id)
 
-      <View style={styles.clubInfo}>
-        <Text style={styles.clubName}>{club.name}</Text>
-      </View>
+            return (
+              <TouchableOpacity
+                key={club.id}
+                style={styles.clubCard}
+                onPress={() => router.push(`/club/${club.id}`)}
+              >
+                <View style={styles.clubIcon}>
+                  <Text style={styles.clubIconText}>
+                    {club.name?.[0]?.toUpperCase() ?? '?'}
+                  </Text>
+                </View>
 
-      {alreadyJoined ? (
-        <Text style={styles.joinedLabel}>Joined</Text>
-      ) : (
-        <TouchableOpacity
-          style={styles.joinButton}
-          onPress={(e) => {
-            e.stopPropagation()
-            joinClub(club.id)
-          }}
-        >
-          <Text style={styles.joinButtonText}>Join</Text>
-        </TouchableOpacity>
+                <View style={styles.clubInfo}>
+                  <Text style={styles.clubName}>{club.name}</Text>
+                </View>
+
+                {alreadyJoined ? (
+                  <Text style={styles.joinedLabel}>Joined</Text>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.joinButton}
+                    onPress={(e) => {
+                      e.stopPropagation()
+                      joinClub(club.id)
+                    }}
+                  >
+                    <Text style={styles.joinButtonText}>Join</Text>
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            )
+          })}
+        </>
       )}
-    </TouchableOpacity>
-  )
-})}
+
+      {category === 'races' && (
+        <>
+          {filteredRaces.length === 0 && (
+            <Text style={styles.emptyText}>No open races found.</Text>
+          )}
+          {filteredRaces.map((race) => (
+            <TouchableOpacity
+              key={race.id}
+              style={styles.raceCard}
+              onPress={() => router.push({ pathname: '/race/[id]', params: { id: race.id } })}
+            >
+              <View style={styles.raceHeader}>
+                <Text style={styles.raceName}>{race.name}</Text>
+                <View style={styles.badgeActive}>
+                  <Text style={styles.badgeActiveText}>Active</Text>
+                </View>
+              </View>
+              <Text style={styles.raceMeta}>
+                {race.clubs?.name ? `${race.clubs.name} · ` : ''}
+                {new Date(race.start_date).toLocaleDateString()} – {new Date(race.end_date).toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
+
+      {category === 'people' && (
+        <>
+          {searchQuery.trim().length === 0 && (
+            <Text style={styles.emptyText}>Search for a username to find people.</Text>
+          )}
+          {searchQuery.trim().length > 0 && searchResults.length === 0 && (
+            <Text style={styles.emptyText}>No runners found.</Text>
+          )}
+          {searchResults.map((user) => (
+            <UserRow
+              key={user.id}
+              username={user.username}
+              isFollowing={myFollowingIds.has(user.id)}
+              onToggleFollow={() => toggleFollow(user.id)}
+              onPress={() => router.push(`/user/${user.id}`)}
+            />
+          ))}
+        </>
+      )}
     </ScrollView>
   )
 }
@@ -173,12 +362,26 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 16,
   },
-  subtitle: {
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  chip: { borderWidth: 0.5, borderColor: colors.border, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14 },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: colors.background },
+  searchInput: {
+    backgroundColor: colors.card,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    color: colors.textPrimary,
     fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 24,
   },
   createRow: {
     flexDirection: 'row',
@@ -210,6 +413,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     marginBottom: 16,
+  },
+  emptyText: {
+    color: colors.textSecondary,
+    fontSize: 13,
   },
   clubCard: {
     flexDirection: 'row',
@@ -260,4 +467,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  raceCard: {
+    backgroundColor: colors.card,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  raceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  raceName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  raceMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 6 },
+  badgeActive: { backgroundColor: '#1c2b12', borderRadius: 20, paddingVertical: 4, paddingHorizontal: 10 },
+  badgeActiveText: { color: colors.accent, fontSize: 11, fontWeight: '600' },
 })

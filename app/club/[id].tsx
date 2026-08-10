@@ -43,7 +43,7 @@ export default function ClubDetailScreen() {
 
     const { data: races, error: racesError } = await supabase
       .from('races')
-      .select('id')
+      .select('id, race_type')
       .eq('club_id', id)
 
     console.log("CLUB RACES:", races)
@@ -55,17 +55,17 @@ export default function ClubDetailScreen() {
       return
     }
 
-    const raceIds = races.map((r) => r.id)
-
     const pointsByUser: { [userId: string]: { points: number; username: string } } = {}
 
-    for (const raceId of raceIds) {
+    for (const race of races) {
+      const isLiveRace = race.race_type === 'live_race'
+
       const { data: participants } = await supabase
         .from('race_participants')
-        .select('user_id, distance_km, profiles(username)')
-        .eq('race_id', raceId)
-        .not('distance_km', 'is', null)
-        .order('distance_km', { ascending: false })
+        .select('user_id, distance_km, duration_seconds, profiles(username)')
+        .eq('race_id', race.id)
+        .not(isLiveRace ? 'duration_seconds' : 'distance_km', 'is', null)
+        .order(isLiveRace ? 'duration_seconds' : 'distance_km', { ascending: isLiveRace })
 
       if (!participants) continue
 

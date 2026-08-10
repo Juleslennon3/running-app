@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
     KeyboardAvoidingView,
@@ -11,25 +11,27 @@ import {
     View
 } from 'react-native'
 
-import { Session } from '@supabase/supabase-js'
-import { supabase } from '../../lib/supabase'
-import { colors } from '../../lib/theme'
+import { useSession } from '../../../lib/auth-context'
+import { supabase } from '../../../lib/supabase'
+import { colors } from '../../../lib/theme'
+
+function formatDuration(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
 
 export default function RaceDetailScreen() {
   const { id } = useLocalSearchParams()
-  const [session, setSession] = useState<Session | null>(null)
+  const router = useRouter()
+  const { session } = useSession()
   const [race, setRace] = useState<any>(null)
   const [joined, setJoined] = useState(false)
+  const [myDurationSeconds, setMyDurationSeconds] = useState<number | null>(null)
   const [distanceInput, setDistanceInput] = useState('')
   const [leaderboard, setLeaderboard] = useState<any[]>([])
   const [message, setMessage] = useState('')
   const [hostUsername, setHostUsername] = useState('Unknown')
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
-  }, [])
 
   useEffect(() => {
     if (id && session) {
@@ -75,7 +77,7 @@ export default function RaceDetailScreen() {
   async function checkIfJoined() {
     const { data } = await supabase
       .from('race_participants')
-      .select('distance_km')
+      .select('distance_km, duration_seconds')
       .eq('race_id', id)
       .eq('user_id', session?.user.id)
       .maybeSingle()
@@ -85,6 +87,7 @@ export default function RaceDetailScreen() {
       if (data.distance_km !== null) {
         setDistanceInput(String(data.distance_km))
       }
+      setMyDurationSeconds(data.duration_seconds)
     }
   }
 
@@ -131,9 +134,8 @@ export default function RaceDetailScreen() {
   async function fetchLeaderboard() {
     const { data, error } = await supabase
       .from('race_participants')
-      .select('distance_km, user_id, profiles(username)')
+      .select('distance_km, duration_seconds, user_id, profiles(username)')
       .eq('race_id', id)
-      .order('distance_km', { ascending: false })
 
     console.log("LEADERBOARD:", data)
     console.log("LEADERBOARD ERROR:", error)
@@ -157,6 +159,16 @@ export default function RaceDetailScreen() {
   }
 
   const isActive = getStatus() === 'Active'
+  const isLiveRace = race.race_type === 'live_race'
+
+  const sortedLeaderboard = [...leaderboard].sort((a, b) => {
+    if (isLiveRace) {
+      if (a.duration_seconds === null) return 1
+      if (b.duration_seconds === null) return -1
+      return a.duration_seconds - b.duration_seconds
+    }
+    return (b.distance_km ?? 0) - (a.distance_km ?? 0)
+  })
 
   return (
     <KeyboardAvoidingView
@@ -178,6 +190,10 @@ export default function RaceDetailScreen() {
           <Text style={styles.raceClub}>{race.clubs?.name ?? 'Club race'}</Text>
         )}
 
+        {isLiveRace && (
+          <Text style={styles.raceClub}>Live race · {race.target_distance_km} km</Text>
+        )}
+
         <Text style={styles.raceDates}>
           {new Date(race.start_date).toLocaleDateString()} — {new Date(race.end_date).toLocaleDateString()}
         </Text>
@@ -193,7 +209,23 @@ export default function RaceDetailScreen() {
           </TouchableOpacity>
         )}
 
-        {joined && isActive && (
+        {joined && isActive && isLiveRace && myDurationSeconds === null && (
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => router.push(`/race/${id}/track`)}
+          >
+            <Text style={styles.primaryButtonText}>Start race</Text>
+          </TouchableOpacity>
+        )}
+
+        {joined && isLiveRace && myDurationSeconds !== null && (
+          <View style={styles.submitCard}>
+            <Text style={styles.submitLabel}>Your time</Text>
+            <Text style={styles.myTimeText}>{formatDuration(myDurationSeconds)}</Text>
+          </View>
+        )}
+
+        {joined && isActive && !isLiveRace && (
           <View style={styles.submitCard}>
             <Text style={styles.submitLabel}>Your distance (km)</Text>
             <View style={styles.submitRow}>
@@ -213,11 +245,15 @@ export default function RaceDetailScreen() {
         )}
 
         <Text style={styles.sectionTitle}>Leaderboard</Text>
-        {leaderboard.length === 0 && (
+        {sortedLeaderboard.length === 0 && (
           <Text style={styles.emptyText}>No results yet.</Text>
         )}
-        {leaderboard.map((entry, index) => {
+        {sortedLeaderboard.map((entry, index) => {
           const isYou = entry.user_id === session?.user.id
+          const resultText = isLiveRace
+            ? (entry.duration_seconds !== null ? formatDuration(entry.duration_seconds) : '—')
+            : (entry.distance_km !== null ? `${entry.distance_km} km` : '—')
+
           return (
             <View key={index} style={[styles.leaderboardRow, isYou && styles.leaderboardRowYou]}>
               <Text style={[styles.leaderboardRank, isYou && styles.leaderboardTextYou]}>{index + 1}</Text>
@@ -225,7 +261,7 @@ export default function RaceDetailScreen() {
                 {isYou ? 'You' : entry.profiles?.username ?? 'Unknown'}
               </Text>
               <Text style={[styles.leaderboardDistance, isYou && styles.leaderboardTextYou]}>
-                {entry.distance_km !== null ? `${entry.distance_km} km` : '—'}
+                {resultText}
               </Text>
             </View>
           )
@@ -256,6 +292,7 @@ const styles = StyleSheet.create({
   submitCard: { backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border, borderRadius: 14, padding: 16, marginBottom: 24 },
   submitLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 10 },
   submitRow: { flexDirection: 'row', gap: 10 },
+  myTimeText: { color: colors.textPrimary, fontSize: 28, fontWeight: 'bold' },
   input: { flex: 1, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, borderRadius: 10, padding: 12, color: colors.textPrimary, fontSize: 14 },
   submitButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 18 },
   submitButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 13 },

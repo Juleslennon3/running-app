@@ -317,6 +317,7 @@ export default function ExploreScreen() {
                 </View>
               </View>
               <Text style={styles.raceMeta}>
+                {race.race_type === 'live_race' ? `Live · ${race.target_distance_km} km · ` : ''}
                 {race.clubs?.name ? `${race.clubs.name} · ` : ''}
                 {new Date(race.start_date).toLocaleDateString()} – {new Date(race.end_date).toLocaleDateString()}
               </Text>

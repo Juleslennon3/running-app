@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Run Club uses your location to track your distance and pace during a live race."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -37,6 +40,12 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Run Club uses your location to track your distance and pace during a live race."
         }
       ]
     ],

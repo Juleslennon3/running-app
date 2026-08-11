@@ -16,6 +16,7 @@ export default function UserProfileScreen() {
   const { session } = useSession()
 
   const [username, setUsername] = useState('')
+  const [eloRating, setEloRating] = useState(1200)
   const [clubs, setClubs] = useState<any[]>([])
   const [races, setRaces] = useState<any[]>([])
   const [totalDistance, setTotalDistance] = useState(0)
@@ -46,7 +47,7 @@ export default function UserProfileScreen() {
   async function fetchProfile() {
     const { data, error } = await supabase
       .from('profiles')
-      .select('username')
+      .select('username, elo_rating')
       .eq('id', id)
       .single()
 
@@ -55,6 +56,7 @@ export default function UserProfileScreen() {
 
     if (!error && data) {
       setUsername(data.username)
+      setEloRating(data.elo_rating)
     }
   }
 
@@ -75,7 +77,7 @@ export default function UserProfileScreen() {
   async function fetchRacesAndStats() {
     const { data: participations, error } = await supabase
       .from('race_participants')
-      .select('distance_km, race_id, races(id, name, end_date)')
+      .select('distance_km, race_id, races(id, name, end_date, target_distance_km)')
       .eq('user_id', id)
 
     console.log("USER RACE PARTICIPATIONS:", participations)
@@ -100,12 +102,17 @@ export default function UserProfileScreen() {
 
       const { data: allParticipants } = await supabase
         .from('race_participants')
-        .select('user_id, distance_km')
+        .select('user_id, duration_seconds, distance_km')
         .eq('race_id', race.id)
-        .order('distance_km', { ascending: false })
+        .not('duration_seconds', 'is', null)
+        .order('duration_seconds', { ascending: true })
 
-      const topFinisher = allParticipants?.[0]
-      const won = !!(topFinisher && topFinisher.user_id === id && topFinisher.distance_km)
+      const finishers = (allParticipants ?? []).filter(
+        (p: any) => !race.target_distance_km || (p.distance_km ?? 0) >= race.target_distance_km
+      )
+
+      const topFinisher = finishers[0]
+      const won = !!(topFinisher && topFinisher.user_id === id)
 
       if (won) wins++
       results.push({ raceId: race.id, won })
@@ -166,8 +173,13 @@ export default function UserProfileScreen() {
         </View>
         <View style={styles.profileInfo}>
           <Text style={styles.title}>{username || 'Runner'}</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelBadgeText}>{getLevelLabel(totalDistance)}</Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>{getLevelLabel(totalDistance)}</Text>
+            </View>
+            <View style={styles.eloBadge}>
+              <Text style={styles.eloBadgeText}>{eloRating} ELO</Text>
+            </View>
           </View>
           <View style={styles.followRow}>
             <TouchableOpacity onPress={() => router.push(`/user/${id}/followers`)}>
@@ -296,16 +308,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
   },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
   levelBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#1c2b12',
     borderRadius: 20,
     paddingVertical: 3,
     paddingHorizontal: 10,
-    marginTop: 6,
   },
   levelBadgeText: {
     color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  eloBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.card,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  eloBadgeText: {
+    color: colors.textPrimary,
     fontSize: 11,
     fontWeight: '600',
   },

@@ -18,6 +18,8 @@ export default function ProfileScreen() {
   const router = useRouter()
   const { session, signOut } = useSession()
   const [username, setUsername] = useState('')
+  const [eloRating, setEloRating] = useState(1200)
+  const [gender, setGender] = useState<'male' | 'female' | 'unspecified'>('unspecified')
   const [myClubs, setMyClubs] = useState<any[]>([])
   const [myRaces, setMyRaces] = useState<any[]>([])
   const [totalDistance, setTotalDistance] = useState(0)
@@ -39,6 +41,7 @@ export default function ProfileScreen() {
     useCallback(() => {
       if (session) {
         fetchFollowCounts()
+        fetchProfile()
       }
     }, [session])
   )
@@ -56,7 +59,7 @@ export default function ProfileScreen() {
   async function fetchProfile() {
     const { data, error } = await supabase
       .from('profiles')
-      .select('username')
+      .select('username, elo_rating, gender')
       .eq('id', session?.user.id)
       .single()
 
@@ -65,7 +68,20 @@ export default function ProfileScreen() {
 
     if (!error && data) {
       setUsername(data.username)
+      setEloRating(data.elo_rating)
+      setGender(data.gender ?? 'unspecified')
     }
+  }
+
+  async function updateGender(newGender: 'male' | 'female' | 'unspecified') {
+    setGender(newGender)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ gender: newGender })
+      .eq('id', session?.user.id)
+
+    console.log("UPDATE GENDER ERROR:", error)
   }
 
   async function fetchMyClubs() {
@@ -84,7 +100,7 @@ export default function ProfileScreen() {
   async function fetchMyRacesAndStats() {
     const { data: participations, error } = await supabase
       .from('race_participants')
-      .select('distance_km, race_id, races(id, name, end_date)')
+      .select('distance_km, race_id, races(id, name, end_date, target_distance_km)')
       .eq('user_id', session?.user.id)
 
     console.log("MY RACE PARTICIPATIONS:", participations)
@@ -111,12 +127,17 @@ export default function ProfileScreen() {
 
       const { data: allParticipants } = await supabase
         .from('race_participants')
-        .select('user_id, distance_km')
+        .select('user_id, duration_seconds, distance_km')
         .eq('race_id', race.id)
-        .order('distance_km', { ascending: false })
+        .not('duration_seconds', 'is', null)
+        .order('duration_seconds', { ascending: true })
 
-      const topFinisher = allParticipants?.[0]
-      const won = !!(topFinisher && topFinisher.user_id === session?.user.id && topFinisher.distance_km)
+      const finishers = (allParticipants ?? []).filter(
+        (p: any) => !race.target_distance_km || (p.distance_km ?? 0) >= race.target_distance_km
+      )
+
+      const topFinisher = finishers[0]
+      const won = !!(topFinisher && topFinisher.user_id === session?.user.id)
 
       if (won) wins++
       results.push({ raceId: race.id, won })
@@ -140,8 +161,13 @@ export default function ProfileScreen() {
         <View style={styles.profileInfo}>
           <Text style={styles.title}>{username || 'Runner'}</Text>
           <Text style={styles.email}>{session.user.email}</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelBadgeText}>{getLevelLabel(totalDistance)}</Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>{getLevelLabel(totalDistance)}</Text>
+            </View>
+            <View style={styles.eloBadge}>
+              <Text style={styles.eloBadgeText}>{eloRating} ELO</Text>
+            </View>
           </View>
           <View style={styles.followRow}>
             <TouchableOpacity onPress={() => router.push(`/user/${session.user.id}/followers`)}>
@@ -160,6 +186,20 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
           <Text style={styles.logoutButtonText}>Log out</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.genderRow}>
+        {(['male', 'female', 'unspecified'] as const).map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[styles.genderChip, gender === option && styles.genderChipActive]}
+            onPress={() => updateGender(option)}
+          >
+            <Text style={[styles.genderChipText, gender === option && styles.genderChipTextActive]}>
+              {option === 'unspecified' ? 'Prefer not to say' : option === 'male' ? 'Male' : 'Female'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.statsCard}>
@@ -287,16 +327,34 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
   levelBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#1c2b12',
     borderRadius: 20,
     paddingVertical: 3,
     paddingHorizontal: 10,
-    marginTop: 6,
   },
   levelBadgeText: {
     color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  eloBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.card,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  eloBadgeText: {
+    color: colors.textPrimary,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -317,6 +375,30 @@ const styles = StyleSheet.create({
   followSep: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  genderChip: {
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  genderChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  genderChipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  genderChipTextActive: {
+    color: colors.background,
   },
   statsCard: {
     flexDirection: 'row',

@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../../lib/auth-context'
-import { useGpsTracking } from '../../../lib/use-gps-tracking'
 import { supabase } from '../../../lib/supabase'
 import { colors } from '../../../lib/theme'
+import { useGpsTracking } from '../../../lib/use-gps-tracking'
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -21,82 +21,62 @@ function formatPace(elapsedSeconds: number, distanceKm: number) {
   return `${minutes}:${seconds.toString().padStart(2, '0')} /km`
 }
 
-export default function TrackRaceScreen() {
-  const { id } = useLocalSearchParams()
+export default function LadderTrackScreen() {
+  const { botId } = useLocalSearchParams()
   const router = useRouter()
   const { session } = useSession()
 
-  const [targetDistanceKm, setTargetDistanceKm] = useState<number | null>(null)
-  const [result, setResult] = useState<{ durationSeconds: number; distanceKm: number; rank: number; totalFinished: number; dnf: boolean } | null>(null)
+  const [bot, setBot] = useState<any>(null)
+  const [result, setResult] = useState<{ durationSeconds: number; distanceKm: number; beatBot: boolean; dnf: boolean } | null>(null)
 
   const { phase, elapsedSeconds, distanceMeters, start, finish } = useGpsTracking({
-    targetDistanceKm,
+    targetDistanceKm: bot?.distance_km ?? null,
     onFinish: handleFinish,
   })
 
   useEffect(() => {
-    fetchTargetDistance()
+    fetchBot()
   }, [])
 
-  async function fetchTargetDistance() {
+  async function fetchBot() {
     const { data, error } = await supabase
-      .from('races')
-      .select('target_distance_km')
-      .eq('id', id)
+      .from('bot_opponents')
+      .select('*')
+      .eq('id', botId)
       .single()
 
-    console.log("TARGET DISTANCE ERROR:", error)
+    console.log("BOT FETCH ERROR:", error)
 
     if (!error && data) {
-      setTargetDistanceKm(data.target_distance_km)
+      setBot(data)
     }
   }
 
   async function handleFinish({ durationSeconds, distanceKm }: { durationSeconds: number; distanceKm: number }) {
-    const dnf = !!targetDistanceKm && distanceKm < targetDistanceKm
+    const dnf = distanceKm < bot.distance_km
+    const beatBot = !dnf && durationSeconds < bot.time_seconds
 
     const { error } = await supabase
-      .from('race_participants')
-      .update({ distance_km: distanceKm, duration_seconds: durationSeconds })
-      .eq('race_id', id)
-      .eq('user_id', session?.user.id)
+      .from('bot_attempts')
+      .insert({
+        user_id: session?.user.id,
+        bot_id: bot.id,
+        duration_seconds: durationSeconds,
+        distance_km: distanceKm,
+        beat_bot: beatBot,
+      })
 
-    console.log("FINISH RACE UPDATE ERROR:", error)
+    console.log("BOT ATTEMPT INSERT ERROR:", error)
 
-    const { data: others, error: othersError } = await supabase
-      .from('race_participants')
-      .select('duration_seconds, distance_km')
-      .eq('race_id', id)
-      .not('duration_seconds', 'is', null)
-
-    console.log("OTHERS FOR RANK ERROR:", othersError)
-
-    const finishers = (others ?? []).filter(
-      (r: any) => !targetDistanceKm || (r.distance_km ?? 0) >= targetDistanceKm
-    )
-    const faster = finishers.filter((r: any) => r.duration_seconds < durationSeconds).length
-
-    setResult({
-      durationSeconds,
-      distanceKm,
-      rank: faster + 1,
-      totalFinished: finishers.length,
-      dnf,
-    })
-
-    const { error: eloError } = await supabase.rpc('apply_elo_for_finish', {
-      p_race_id: id,
-      p_finisher_id: session?.user.id,
-    })
-
-    console.log("APPLY ELO ERROR:", eloError)
+    setResult({ durationSeconds, distanceKm, beatBot, dnf })
   }
 
-  function rankLabel(rank: number) {
-    if (rank === 1) return '1st'
-    if (rank === 2) return '2nd'
-    if (rank === 3) return '3rd'
-    return `${rank}th`
+  if (!bot) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.message}>Loading…</Text>
+      </View>
+    )
   }
 
   if (phase === 'requesting') {
@@ -112,7 +92,7 @@ export default function TrackRaceScreen() {
       <View style={styles.centerContainer}>
         <Text style={styles.title}>Location access needed</Text>
         <Text style={styles.message}>
-          Run Club needs location access to track your distance and pace during a live race.
+          Run Club needs location access to track your distance and pace during a challenge.
           Enable it in your device settings, then come back here.
         </Text>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => router.back()}>
@@ -125,10 +105,10 @@ export default function TrackRaceScreen() {
   if (phase === 'ready') {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.title}>Ready to race?</Text>
-        {targetDistanceKm && (
-          <Text style={styles.message}>Target distance: {targetDistanceKm} km</Text>
-        )}
+        <Text style={styles.title}>Beat {bot.name}?</Text>
+        <Text style={styles.message}>
+          Target: {formatDuration(bot.time_seconds)} over {bot.distance_km} km
+        </Text>
         <TouchableOpacity style={styles.startButton} onPress={start}>
           <Text style={styles.startButtonText}>Start</Text>
         </TouchableOpacity>
@@ -143,9 +123,7 @@ export default function TrackRaceScreen() {
       <View style={styles.centerContainer}>
         <Text style={styles.liveTimer}>{formatDuration(elapsedSeconds)}</Text>
         <Text style={styles.liveDistance}>{distanceKm.toFixed(2)} km</Text>
-        {targetDistanceKm && (
-          <Text style={styles.liveTarget}>of {targetDistanceKm} km target</Text>
-        )}
+        <Text style={styles.liveTarget}>of {bot.distance_km} km · beat {formatDuration(bot.time_seconds)}</Text>
         <Text style={styles.livePace}>{formatPace(elapsedSeconds, distanceKm)}</Text>
 
         <TouchableOpacity style={styles.finishButton} onPress={finish}>
@@ -160,20 +138,20 @@ export default function TrackRaceScreen() {
     <View style={styles.centerContainer}>
       {result ? (
         <>
-          <Text style={[styles.resultRank, result.dnf && styles.resultRankDnf]}>
-            {result.dnf ? 'DNF' : `${rankLabel(result.rank)} place`}
+          <Text style={[styles.resultRank, !result.beatBot && styles.resultRankLoss]}>
+            {result.dnf ? 'DNF' : result.beatBot ? `You beat ${bot.name}!` : `${bot.name} won`}
           </Text>
           <Text style={styles.message}>
             {result.dnf
-              ? `You covered ${result.distanceKm.toFixed(2)} of ${targetDistanceKm} km — didn't finish the distance`
-              : `${formatDuration(result.durationSeconds)} · ${result.distanceKm.toFixed(2)} km`}
+              ? `You covered ${result.distanceKm.toFixed(2)} of ${bot.distance_km} km — didn't finish the distance`
+              : `You: ${formatDuration(result.durationSeconds)} · ${bot.name}: ${formatDuration(bot.time_seconds)}`}
           </Text>
         </>
       ) : (
         <Text style={styles.message}>Saving your result…</Text>
       )}
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.back()}>
-        <Text style={styles.secondaryButtonText}>View leaderboard</Text>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.replace('/explore')}>
+        <Text style={styles.secondaryButtonText}>Back to ladder</Text>
       </TouchableOpacity>
     </View>
   )
@@ -249,12 +227,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   resultRank: {
-    fontSize: 40,
+    fontSize: 32,
     fontWeight: 'bold',
     color: colors.accent,
     marginBottom: 10,
+    textAlign: 'center',
   },
-  resultRankDnf: {
+  resultRankLoss: {
     color: colors.danger,
   },
   secondaryButton: {

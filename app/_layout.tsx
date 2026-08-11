@@ -41,6 +41,7 @@ return (
 <Stack.Screen name="race/[id]/index" options={{ title: 'Race', headerShown: true }} />
 <Stack.Screen name="race/[id]/track" options={{ headerShown: false }} />
 <Stack.Screen name="invites" options={{ title: 'Race Invites', headerShown: true }} />
+<Stack.Screen name="ladder/[botId]/track" options={{ headerShown: false }} />
 <Stack.Screen name="user/[id]/index" options={{ title: 'Profile', headerShown: true }} />
 <Stack.Screen name="user/[id]/followers" options={{ title: 'Followers', headerShown: true }} />
 <Stack.Screen name="user/[id]/following" options={{ title: 'Following', headerShown: true }} />

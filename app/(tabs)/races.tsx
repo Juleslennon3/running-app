@@ -23,11 +23,6 @@ const FILTER_OPTIONS: { key: 'all' | 'myClubs' | 'open'; label: string }[] = [
   { key: 'open', label: 'Open' },
 ]
 
-const RACE_TYPE_OPTIONS: { key: 'distance_challenge' | 'live_race'; label: string }[] = [
-  { key: 'distance_challenge', label: 'Distance Challenge' },
-  { key: 'live_race', label: 'Live Race' },
-]
-
 export default function RacesScreen() {
 
   const router = useRouter()
@@ -46,7 +41,6 @@ export default function RacesScreen() {
   const [selectedInviteeIds, setSelectedInviteeIds] = useState<Set<string>>(new Set())
   const [pendingInviteCount, setPendingInviteCount] = useState(0)
   const [autoJoin, setAutoJoin] = useState(true)
-  const [raceType, setRaceType] = useState<'distance_challenge' | 'live_race'>('distance_challenge')
   const [targetDistanceInput, setTargetDistanceInput] = useState('5')
 
   useEffect(() => {
@@ -186,7 +180,7 @@ export default function RacesScreen() {
 
     const targetDistanceKm = parseFloat(targetDistanceInput)
 
-    if (raceType === 'live_race' && (isNaN(targetDistanceKm) || targetDistanceKm <= 0)) {
+    if (isNaN(targetDistanceKm) || targetDistanceKm <= 0) {
       setMessage('Enter a valid target distance')
       return
     }
@@ -204,8 +198,8 @@ export default function RacesScreen() {
         end_date: endDate.toISOString(),
         club_id: selectedClubId,
         is_private: selectedInviteeIds.size > 0,
-        race_type: raceType,
-        target_distance_km: raceType === 'live_race' ? targetDistanceKm : null,
+        race_type: 'live_race',
+        target_distance_km: targetDistanceKm,
       })
       .select()
       .single()
@@ -260,7 +254,6 @@ export default function RacesScreen() {
     setSelectedClubId(null)
     setSelectedInviteeIds(new Set())
     setAutoJoin(true)
-    setRaceType('distance_challenge')
     setTargetDistanceInput('5')
     setModalVisible(false)
     fetchRaces()
@@ -306,8 +299,8 @@ export default function RacesScreen() {
         </View>
 
         <View style={styles.tagRow}>
-          {race.race_type === 'live_race' && (
-            <Text style={styles.raceClub}>Live · {race.target_distance_km} km</Text>
+          {race.target_distance_km && (
+            <Text style={styles.raceClub}>{race.target_distance_km} km</Text>
           )}
           {race.club_id && (
             <Text style={styles.raceClub}>{race.clubs?.name ?? 'Club race'}</Text>
@@ -398,34 +391,15 @@ export default function RacesScreen() {
               style={styles.input}
             />
 
-            <Text style={styles.modalLabel}>Race type</Text>
-            <View style={styles.clubPickerRow}>
-              {RACE_TYPE_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[styles.chip, raceType === option.key && styles.chipActive]}
-                  onPress={() => setRaceType(option.key)}
-                >
-                  <Text style={[styles.chipText, raceType === option.key && styles.chipTextActive]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {raceType === 'live_race' && (
-              <>
-                <Text style={styles.modalLabel}>Target distance (km)</Text>
-                <TextInput
-                  placeholder="e.g. 5"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                  value={targetDistanceInput}
-                  onChangeText={setTargetDistanceInput}
-                  style={styles.input}
-                />
-              </>
-            )}
+            <Text style={styles.modalLabel}>Target distance (km)</Text>
+            <TextInput
+              placeholder="e.g. 5"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+              value={targetDistanceInput}
+              onChangeText={setTargetDistanceInput}
+              style={styles.input}
+            />
 
             <Text style={styles.modalLabel}>Attach to a club (optional)</Text>
             <View style={styles.clubPickerRow}>

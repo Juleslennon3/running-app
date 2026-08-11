@@ -1,12 +1,9 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useCallback, useEffect, useState } from 'react'
 import {
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from 'react-native'
@@ -28,7 +25,7 @@ export default function RaceDetailScreen() {
   const [race, setRace] = useState<any>(null)
   const [joined, setJoined] = useState(false)
   const [myDurationSeconds, setMyDurationSeconds] = useState<number | null>(null)
-  const [distanceInput, setDistanceInput] = useState('')
+  const [myDistanceKm, setMyDistanceKm] = useState<number | null>(null)
   const [leaderboard, setLeaderboard] = useState<any[]>([])
   const [message, setMessage] = useState('')
   const [hostUsername, setHostUsername] = useState('Unknown')
@@ -40,6 +37,15 @@ export default function RaceDetailScreen() {
       fetchLeaderboard()
     }
   }, [id, session])
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id && session) {
+        checkIfJoined()
+        fetchLeaderboard()
+      }
+    }, [id, session])
+  )
 
   async function fetchRace() {
     const { data, error } = await supabase
@@ -77,17 +83,15 @@ export default function RaceDetailScreen() {
   async function checkIfJoined() {
     const { data } = await supabase
       .from('race_participants')
-      .select('distance_km, duration_seconds')
+      .select('duration_seconds, distance_km')
       .eq('race_id', id)
       .eq('user_id', session?.user.id)
       .maybeSingle()
 
     if (data) {
       setJoined(true)
-      if (data.distance_km !== null) {
-        setDistanceInput(String(data.distance_km))
-      }
       setMyDurationSeconds(data.duration_seconds)
+      setMyDistanceKm(data.distance_km)
     }
   }
 
@@ -107,34 +111,10 @@ export default function RaceDetailScreen() {
     }
   }
 
-  async function submitDistance() {
-    const value = parseFloat(distanceInput)
-
-    if (isNaN(value)) {
-      setMessage('Enter a valid number')
-      return
-    }
-
-    const { error } = await supabase
-      .from('race_participants')
-      .update({ distance_km: value })
-      .eq('race_id', id)
-      .eq('user_id', session?.user.id)
-
-    console.log("SUBMIT DISTANCE ERROR:", error)
-
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage('Distance submitted!')
-      fetchLeaderboard()
-    }
-  }
-
   async function fetchLeaderboard() {
     const { data, error } = await supabase
       .from('race_participants')
-      .select('distance_km, duration_seconds, user_id, profiles(username)')
+      .select('duration_seconds, distance_km, user_id, profiles(username)')
       .eq('race_id', id)
 
     console.log("LEADERBOARD:", data)
@@ -159,115 +139,111 @@ export default function RaceDetailScreen() {
   }
 
   const isActive = getStatus() === 'Active'
-  const isLiveRace = race.race_type === 'live_race'
+
+  function isDnf(entry: { duration_seconds: number | null; distance_km: number | null }) {
+    const targetKm = race?.target_distance_km
+    return entry.duration_seconds !== null && !!targetKm && (entry.distance_km ?? 0) < targetKm
+  }
+
+  const myDnf = myDurationSeconds !== null && isDnf({ duration_seconds: myDurationSeconds, distance_km: myDistanceKm })
 
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
-    if (isLiveRace) {
-      if (a.duration_seconds === null) return 1
-      if (b.duration_seconds === null) return -1
-      return a.duration_seconds - b.duration_seconds
-    }
-    return (b.distance_km ?? 0) - (a.distance_km ?? 0)
+    if (a.duration_seconds === null) return 1
+    if (b.duration_seconds === null) return -1
+    const aDnf = isDnf(a)
+    const bDnf = isDnf(b)
+    if (aDnf && !bDnf) return 1
+    if (!aDnf && bDnf) return -1
+    if (aDnf && bDnf) return (b.distance_km ?? 0) - (a.distance_km ?? 0)
+    return a.duration_seconds - b.duration_seconds
   })
 
+  function medalStyle(rank: number) {
+    if (rank === 0) return styles.rankGold
+    if (rank === 1) return styles.rankSilver
+    if (rank === 2) return styles.rankBronze
+    return null
+  }
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: colors.background }}
-      keyboardVerticalOffset={90}
-    >
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>{race.name}</Text>
-          <View style={isActive ? styles.badgeActive : styles.badgeEnded}>
-            <Text style={isActive ? styles.badgeActiveText : styles.badgeEndedText}>
-              {isActive ? 'Active' : 'Ended'}
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>{race.name}</Text>
+        <View style={isActive ? styles.badgeActive : styles.badgeEnded}>
+          <Text style={isActive ? styles.badgeActiveText : styles.badgeEndedText}>
+            {isActive ? 'Active' : 'Ended'}
+          </Text>
+        </View>
+      </View>
+
+      {race.target_distance_km && (
+        <Text style={styles.raceClub}>{race.target_distance_km} km</Text>
+      )}
+      {race.club_id && (
+        <Text style={styles.raceClub}>{race.clubs?.name ?? 'Club race'}</Text>
+      )}
+
+      <Text style={styles.raceDates}>
+        {new Date(race.start_date).toLocaleDateString()} — {new Date(race.end_date).toLocaleDateString()}
+      </Text>
+
+      <Text style={styles.raceHost}>Hosted by {hostUsername}</Text>
+      <Text style={styles.participantCount}>{leaderboard.length} joined</Text>
+
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+
+      {!joined && isActive && (
+        <TouchableOpacity style={styles.primaryButton} onPress={joinRace}>
+          <Text style={styles.primaryButtonText}>Join race</Text>
+        </TouchableOpacity>
+      )}
+
+      {joined && isActive && myDurationSeconds === null && (
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push(`/race/${id}/track`)}
+        >
+          <Text style={styles.primaryButtonText}>Start race</Text>
+        </TouchableOpacity>
+      )}
+
+      {joined && myDurationSeconds !== null && (
+        <View style={styles.submitCard}>
+          <Text style={styles.submitLabel}>{myDnf ? 'Result' : 'Your time'}</Text>
+          {myDnf ? (
+            <Text style={styles.myDnfText}>DNF · {myDistanceKm} of {race.target_distance_km} km</Text>
+          ) : (
+            <Text style={styles.myTimeText}>{formatDuration(myDurationSeconds)}</Text>
+          )}
+        </View>
+      )}
+
+      <Text style={styles.sectionTitle}>Leaderboard</Text>
+      {sortedLeaderboard.length === 0 && (
+        <Text style={styles.emptyText}>No results yet.</Text>
+      )}
+      {sortedLeaderboard.map((entry, index) => {
+        const isYou = entry.user_id === session?.user.id
+        const entryDnf = isDnf(entry)
+        const medal = entryDnf ? null : medalStyle(index)
+
+        return (
+          <View key={index} style={[styles.leaderboardRow, isYou && styles.leaderboardRowYou]}>
+            <View style={[styles.rankBadge, medal]}>
+              <Text style={[styles.rankBadgeText, medal && styles.rankBadgeTextMedal]}>
+                {entryDnf ? '—' : index + 1}
+              </Text>
+            </View>
+            <Text style={[styles.leaderboardName, isYou && styles.leaderboardTextYou]}>
+              {isYou ? 'You' : entry.profiles?.username ?? 'Unknown'}
+            </Text>
+            <Text style={[styles.leaderboardDistance, entryDnf ? styles.leaderboardDnf : isYou && styles.leaderboardTextYou]}>
+              {entry.duration_seconds === null ? '—' : entryDnf ? 'DNF' : formatDuration(entry.duration_seconds)}
             </Text>
           </View>
-        </View>
-
-        {race.club_id && (
-          <Text style={styles.raceClub}>{race.clubs?.name ?? 'Club race'}</Text>
-        )}
-
-        {isLiveRace && (
-          <Text style={styles.raceClub}>Live race · {race.target_distance_km} km</Text>
-        )}
-
-        <Text style={styles.raceDates}>
-          {new Date(race.start_date).toLocaleDateString()} — {new Date(race.end_date).toLocaleDateString()}
-        </Text>
-
-        <Text style={styles.raceHost}>Hosted by {hostUsername}</Text>
-        <Text style={styles.participantCount}>{leaderboard.length} joined</Text>
-
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-
-        {!joined && isActive && (
-          <TouchableOpacity style={styles.primaryButton} onPress={joinRace}>
-            <Text style={styles.primaryButtonText}>Join race</Text>
-          </TouchableOpacity>
-        )}
-
-        {joined && isActive && isLiveRace && myDurationSeconds === null && (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => router.push(`/race/${id}/track`)}
-          >
-            <Text style={styles.primaryButtonText}>Start race</Text>
-          </TouchableOpacity>
-        )}
-
-        {joined && isLiveRace && myDurationSeconds !== null && (
-          <View style={styles.submitCard}>
-            <Text style={styles.submitLabel}>Your time</Text>
-            <Text style={styles.myTimeText}>{formatDuration(myDurationSeconds)}</Text>
-          </View>
-        )}
-
-        {joined && isActive && !isLiveRace && (
-          <View style={styles.submitCard}>
-            <Text style={styles.submitLabel}>Your distance (km)</Text>
-            <View style={styles.submitRow}>
-              <TextInput
-                placeholder="e.g. 12.4"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={distanceInput}
-                onChangeText={setDistanceInput}
-                style={styles.input}
-              />
-              <TouchableOpacity style={styles.submitButton} onPress={submitDistance}>
-                <Text style={styles.submitButtonText}>Submit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>Leaderboard</Text>
-        {sortedLeaderboard.length === 0 && (
-          <Text style={styles.emptyText}>No results yet.</Text>
-        )}
-        {sortedLeaderboard.map((entry, index) => {
-          const isYou = entry.user_id === session?.user.id
-          const resultText = isLiveRace
-            ? (entry.duration_seconds !== null ? formatDuration(entry.duration_seconds) : '—')
-            : (entry.distance_km !== null ? `${entry.distance_km} km` : '—')
-
-          return (
-            <View key={index} style={[styles.leaderboardRow, isYou && styles.leaderboardRowYou]}>
-              <Text style={[styles.leaderboardRank, isYou && styles.leaderboardTextYou]}>{index + 1}</Text>
-              <Text style={[styles.leaderboardName, isYou && styles.leaderboardTextYou]}>
-                {isYou ? 'You' : entry.profiles?.username ?? 'Unknown'}
-              </Text>
-              <Text style={[styles.leaderboardDistance, isYou && styles.leaderboardTextYou]}>
-                {resultText}
-              </Text>
-            </View>
-          )
-        })}
-      </ScrollView>
-    </KeyboardAvoidingView>
+        )
+      })}
+    </ScrollView>
   )
 }
 
@@ -291,17 +267,26 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
   submitCard: { backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border, borderRadius: 14, padding: 16, marginBottom: 24 },
   submitLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 10 },
-  submitRow: { flexDirection: 'row', gap: 10 },
   myTimeText: { color: colors.textPrimary, fontSize: 28, fontWeight: 'bold' },
-  input: { flex: 1, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, borderRadius: 10, padding: 12, color: colors.textPrimary, fontSize: 14 },
-  submitButton: { backgroundColor: colors.accent, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 18 },
-  submitButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 13 },
+  myDnfText: { color: colors.danger, fontSize: 20, fontWeight: 'bold' },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 12 },
   emptyText: { color: colors.textSecondary, fontSize: 13 },
-  leaderboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 10, gap: 10, borderRadius: 8 },
+  leaderboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 10, gap: 12, borderRadius: 8 },
   leaderboardRowYou: { backgroundColor: '#161a10' },
-  leaderboardRank: { fontWeight: '600', width: 16, color: colors.textSecondary, fontSize: 13 },
+  rankBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankGold: { backgroundColor: '#e8ff2e' },
+  rankSilver: { backgroundColor: '#c7cbd1' },
+  rankBronze: { backgroundColor: '#cd8a4f' },
+  rankBadgeText: { fontWeight: '700', color: colors.textSecondary, fontSize: 12 },
+  rankBadgeTextMedal: { color: colors.background },
   leaderboardName: { flex: 1, color: colors.textPrimary, fontSize: 14 },
   leaderboardDistance: { fontWeight: '600', color: colors.textPrimary, fontSize: 13 },
+  leaderboardDnf: { color: colors.danger },
   leaderboardTextYou: { color: colors.accent },
 })

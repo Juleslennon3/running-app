@@ -50,12 +50,18 @@ export default function NotificationsScreen() {
       return `${actorName} followed you`
     }
 
+    if (notification.type === 'race_match') {
+      return `You've been matched with ${actorName} in ${notification.races?.name || 'a race'}`
+    }
+
     return `${actorName} invited you to ${notification.races?.name || 'a race'}`
   }
 
   function handlePress(notification: any) {
     if (notification.type === 'race_invite') {
       router.push('/invites')
+    } else if (notification.type === 'race_match' && notification.race_id) {
+      router.push({ pathname: '/race/[id]', params: { id: notification.race_id } })
     }
   }
 
@@ -73,7 +79,7 @@ export default function NotificationsScreen() {
           key={notification.id}
           style={[styles.notificationCard, !notification.is_read && styles.notificationCardUnread]}
           onPress={() => handlePress(notification)}
-          activeOpacity={notification.type === 'race_invite' ? 0.7 : 1}
+          activeOpacity={notification.type === 'race_invite' || notification.type === 'race_match' ? 0.7 : 1}
         >
           <View style={styles.notificationIcon}>
             <Text style={styles.notificationIconText}>

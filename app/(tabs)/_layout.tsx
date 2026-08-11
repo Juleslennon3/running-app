@@ -7,7 +7,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
-  initialRouteName: 'explore',
+  initialRouteName: 'races',
 };
 
 export default function TabLayout() {
@@ -15,7 +15,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      initialRouteName="explore"
+      initialRouteName="races"
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
@@ -27,18 +27,18 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="explore"
+        name="races"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="safari.fill" color={color} />,
+          title: 'Race',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="flag.fill" color={color} />,
         }}
       />
 
       <Tabs.Screen
-        name="races"
+        name="explore"
         options={{
-          title: 'Races',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="flag.fill" color={color} />,
+          title: 'Explore',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="safari.fill" color={color} />,
         }}
       />
 

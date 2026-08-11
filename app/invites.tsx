@@ -6,14 +6,16 @@ import { useSession } from '../lib/auth-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../lib/theme'
 
-export default function InvitesScreen() {
+export default function PendingScreen() {
   const router = useRouter()
   const { session } = useSession()
   const [invites, setInvites] = useState<any[]>([])
+  const [waiting, setWaiting] = useState<any[]>([])
 
   useEffect(() => {
     if (session) {
       fetchInvites()
+      fetchWaiting()
     }
   }, [session])
 
@@ -31,6 +33,33 @@ export default function InvitesScreen() {
     if (!error && data) {
       setInvites(data)
     }
+  }
+
+  async function fetchWaiting() {
+    const { data, error } = await supabase
+      .from('race_participants')
+      .select('race_id, races(id, name, end_date, target_distance_km)')
+      .eq('user_id', session?.user.id)
+      .is('duration_seconds', null)
+
+    console.log("WAITING TO RUN DATA:", data)
+    console.log("WAITING TO RUN ERROR:", error)
+
+    if (error || !data) return
+
+    const now = new Date()
+    const expired = data.filter((row: any) => row.races && new Date(row.races.end_date) <= now)
+    const active = data.filter((row: any) => row.races && new Date(row.races.end_date) > now)
+
+    if (expired.length > 0) {
+      await Promise.all(
+        expired.map((row: any) =>
+          supabase.rpc('resolve_expired_race_participants', { p_race_id: row.race_id })
+        )
+      )
+    }
+
+    setWaiting(active)
   }
 
   async function respondToInvite(invite: any, accept: boolean) {
@@ -69,6 +98,7 @@ export default function InvitesScreen() {
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
+      <Text style={styles.sectionTitle}>Invites</Text>
       {invites.length === 0 && (
         <Text style={styles.emptyText}>No pending invites.</Text>
       )}
@@ -94,6 +124,27 @@ export default function InvitesScreen() {
           </View>
         </View>
       ))}
+
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Waiting for your run</Text>
+      {waiting.length === 0 && (
+        <Text style={styles.emptyText}>Nothing waiting on you right now.</Text>
+      )}
+      {waiting.map((row) => (
+        <TouchableOpacity
+          key={row.race_id}
+          style={styles.waitingCard}
+          onPress={() => router.push({ pathname: '/race/[id]', params: { id: row.race_id } })}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.raceName}>{row.races?.name || 'Untitled race'}</Text>
+            <Text style={styles.inviteMeta}>
+              {row.races?.target_distance_km ? `${row.races.target_distance_km} km · ` : ''}
+              Ends {new Date(row.races?.end_date).toLocaleDateString()}
+            </Text>
+          </View>
+          <Text style={styles.waitingArrow}>›</Text>
+        </TouchableOpacity>
+      ))}
     </ScrollView>
   )
 }
@@ -108,6 +159,15 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 60,
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  sectionTitleSpaced: {
+    marginTop: 24,
+  },
   emptyText: {
     color: colors.textSecondary,
     fontSize: 13,
@@ -119,6 +179,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
+  },
+  waitingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  waitingArrow: {
+    fontSize: 20,
+    color: colors.textSecondary,
   },
   raceName: {
     fontSize: 16,

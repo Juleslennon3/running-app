@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
     ScrollView,
     StyleSheet,
@@ -30,22 +30,22 @@ export default function RaceDetailScreen() {
   const [message, setMessage] = useState('')
   const [hostUsername, setHostUsername] = useState('Unknown')
 
-  useEffect(() => {
-    if (id && session) {
-      fetchRace()
-      checkIfJoined()
-      fetchLeaderboard()
-    }
-  }, [id, session])
-
   useFocusEffect(
     useCallback(() => {
       if (id && session) {
-        checkIfJoined()
-        fetchLeaderboard()
+        resolveExpiredThenFetch()
       }
     }, [id, session])
   )
+
+  async function resolveExpiredThenFetch() {
+    const { error } = await supabase.rpc('resolve_expired_race_participants', { p_race_id: id })
+    console.log("RESOLVE EXPIRED PARTICIPANTS ERROR:", error)
+
+    fetchRace()
+    checkIfJoined()
+    fetchLeaderboard()
+  }
 
   async function fetchRace() {
     const { data, error } = await supabase

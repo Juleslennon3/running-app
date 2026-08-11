@@ -40,7 +40,9 @@ return (
 <Stack.Screen name="club/[id]" options={{ title: 'Club', headerShown: true }} />
 <Stack.Screen name="race/[id]/index" options={{ title: 'Race', headerShown: true }} />
 <Stack.Screen name="race/[id]/track" options={{ headerShown: false }} />
-<Stack.Screen name="invites" options={{ title: 'Race Invites', headerShown: true }} />
+<Stack.Screen name="race-online" options={{ title: 'Race Online', headerShown: true }} />
+<Stack.Screen name="invites" options={{ title: 'Pending', headerShown: true }} />
+<Stack.Screen name="practice/[distance]/index" options={{ title: 'Practice', headerShown: true }} />
 <Stack.Screen name="ladder/[botId]/track" options={{ headerShown: false }} />
 <Stack.Screen name="user/[id]/index" options={{ title: 'Profile', headerShown: true }} />
 <Stack.Screen name="user/[id]/followers" options={{ title: 'Followers', headerShown: true }} />

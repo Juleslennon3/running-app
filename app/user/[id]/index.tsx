@@ -1,9 +1,20 @@
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native'
 
 import { FollowButton } from '../../../components/follow-button'
 import { useSession } from '../../../lib/auth-context'
+import { DISTANCE_CATEGORIES } from '../../../lib/distance-categories'
 import { followUser, unfollowUser } from '../../../lib/follow'
 import { getLevelLabel } from '../../../lib/level'
 import { supabase } from '../../../lib/supabase'
@@ -25,6 +36,11 @@ export default function UserProfileScreen() {
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [challengeModalVisible, setChallengeModalVisible] = useState(false)
+  const [challengeKm, setChallengeKm] = useState(DISTANCE_CATEGORIES[1].km)
+  const [challengeUsingCustom, setChallengeUsingCustom] = useState(false)
+  const [challengeCustomInput, setChallengeCustomInput] = useState('')
+  const [challengeMessage, setChallengeMessage] = useState('')
 
   const isOwnProfile = id === session?.user.id
 
@@ -162,6 +178,64 @@ export default function UserProfileScreen() {
     }
   }
 
+  async function sendChallenge() {
+    const distanceKm = challengeUsingCustom ? parseFloat(challengeCustomInput) : challengeKm
+
+    if (!distanceKm || isNaN(distanceKm) || distanceKm <= 0) {
+      setChallengeMessage('Enter a valid distance')
+      return
+    }
+
+    const targetId = Array.isArray(id) ? id[0] : id
+    const startDate = new Date()
+    const endDate = new Date()
+    endDate.setDate(endDate.getDate() + 3)
+
+    const { data, error } = await supabase
+      .from('races')
+      .insert({
+        name: `Challenge: ${username}`,
+        created_by: session?.user.id,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        club_id: null,
+        is_private: true,
+        race_type: 'live_race',
+        target_distance_km: distanceKm,
+      })
+      .select()
+      .single()
+
+    console.log("CHALLENGE RACE ERROR:", error)
+
+    if (error || !data) {
+      setChallengeMessage(error?.message ?? 'Something went wrong')
+      return
+    }
+
+    const { error: joinError } = await supabase
+      .from('race_participants')
+      .insert({ race_id: data.id, user_id: session?.user.id })
+
+    console.log("CHALLENGE AUTO-JOIN ERROR:", joinError)
+
+    const { error: inviteError } = await supabase
+      .from('race_invites')
+      .insert({ race_id: data.id, invited_user_id: targetId, invited_by: session?.user.id })
+
+    console.log("CHALLENGE INVITE ERROR:", inviteError)
+
+    const { error: notificationError } = await supabase
+      .from('notifications')
+      .insert({ user_id: targetId, actor_id: session?.user.id, type: 'race_invite', race_id: data.id })
+
+    console.log("CHALLENGE NOTIFICATION ERROR:", notificationError)
+
+    setChallengeModalVisible(false)
+    setChallengeMessage('')
+    router.push({ pathname: '/race/[id]', params: { id: data.id } })
+  }
+
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
 
@@ -196,7 +270,12 @@ export default function UserProfileScreen() {
           </View>
         </View>
         {!isOwnProfile && (
-          <FollowButton isFollowing={isFollowing} onPress={toggleFollow} />
+          <View style={styles.actionColumn}>
+            <FollowButton isFollowing={isFollowing} onPress={toggleFollow} />
+            <TouchableOpacity style={styles.challengeButton} onPress={() => setChallengeModalVisible(true)}>
+              <Text style={styles.challengeButtonText}>Challenge</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -265,6 +344,66 @@ export default function UserProfileScreen() {
           </View>
         </View>
       ))}
+
+      <Modal
+        visible={challengeModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setChallengeModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Challenge {username}</Text>
+
+            <View style={styles.chipRow}>
+              {DISTANCE_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat.slug}
+                  style={[styles.chip, !challengeUsingCustom && challengeKm === cat.km && styles.chipActive]}
+                  onPress={() => {
+                    setChallengeUsingCustom(false)
+                    setChallengeKm(cat.km)
+                  }}
+                >
+                  <Text style={[styles.chipText, !challengeUsingCustom && challengeKm === cat.km && styles.chipTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.chip, challengeUsingCustom && styles.chipActive]}
+                onPress={() => setChallengeUsingCustom(true)}
+              >
+                <Text style={[styles.chipText, challengeUsingCustom && styles.chipTextActive]}>Custom</Text>
+              </TouchableOpacity>
+            </View>
+
+            {challengeUsingCustom && (
+              <TextInput
+                placeholder="Distance in km"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+                value={challengeCustomInput}
+                onChangeText={setChallengeCustomInput}
+                style={styles.input}
+              />
+            )}
+
+            {challengeMessage ? <Text style={styles.message}>{challengeMessage}</Text> : null}
+
+            <TouchableOpacity style={styles.primaryButton} onPress={sendChallenge}>
+              <Text style={styles.primaryButtonText}>Send challenge</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setChallengeModalVisible(false)}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   )
 }
@@ -475,4 +614,34 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  actionColumn: {
+    gap: 8,
+    alignItems: 'stretch',
+  },
+  challengeButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  challengeButtonText: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 18 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip: { borderWidth: 0.5, borderColor: colors.border, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14 },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: colors.background },
+  input: { backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 18, color: colors.textPrimary, fontSize: 15 },
+  message: { color: colors.textSecondary, fontSize: 13, marginBottom: 16 },
+  primaryButton: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
+  primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
+  cancelButton: { alignItems: 'center', paddingVertical: 10 },
+  cancelButtonText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 })

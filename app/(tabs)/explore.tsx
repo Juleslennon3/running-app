@@ -15,24 +15,17 @@ import { followUser, unfollowUser } from '../../lib/follow'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../lib/theme'
 
-const CATEGORIES: { key: 'clubs' | 'races' | 'people' | 'ladder'; label: string }[] = [
+const CATEGORIES: { key: 'clubs' | 'races' | 'people'; label: string }[] = [
   { key: 'clubs', label: 'Clubs' },
   { key: 'races', label: 'Races' },
   { key: 'people', label: 'People' },
-  { key: 'ladder', label: 'Ladder' },
 ]
-
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
 
 export default function ExploreScreen() {
 
   const { session } = useSession()
   const router = useRouter()
-  const [category, setCategory] = useState<'clubs' | 'races' | 'people' | 'ladder'>('clubs')
+  const [category, setCategory] = useState<'clubs' | 'races' | 'people'>('clubs')
   const [searchQuery, setSearchQuery] = useState('')
   const [message, setMessage] = useState('')
 
@@ -48,18 +41,12 @@ export default function ExploreScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [myFollowingIds, setMyFollowingIds] = useState<Set<string>>(new Set())
 
-  // Ladder
-  const [bots, setBots] = useState<any[]>([])
-  const [beatenBotIds, setBeatenBotIds] = useState<Set<number>>(new Set())
-
   useEffect(() => {
     if (session) {
       fetchClubs()
       fetchMyMemberships()
       fetchOpenRaces()
       fetchMyFollowingIds()
-      fetchBots()
-      fetchBeatenBotIds()
     }
   }, [session])
 
@@ -189,32 +176,6 @@ export default function ExploreScreen() {
 
     if (!error && data) {
       setSearchResults(data)
-    }
-  }
-
-  async function fetchBots() {
-    const { data, error } = await supabase
-      .from('bot_opponents')
-      .select('*')
-      .order('tier', { ascending: true })
-
-    console.log("FETCH BOTS DATA:", data)
-    console.log("FETCH BOTS ERROR:", error)
-
-    if (!error && data) {
-      setBots(data)
-    }
-  }
-
-  async function fetchBeatenBotIds() {
-    const { data, error } = await supabase
-      .from('bot_attempts')
-      .select('bot_id')
-      .eq('user_id', session?.user.id)
-      .eq('beat_bot', true)
-
-    if (!error && data) {
-      setBeatenBotIds(new Set(data.map((row: any) => row.bot_id)))
     }
   }
 
@@ -381,48 +342,6 @@ export default function ExploreScreen() {
               onPress={() => router.push(`/user/${user.id}`)}
             />
           ))}
-        </>
-      )}
-
-      {category === 'ladder' && (
-        <>
-          {bots.length === 0 && (
-            <Text style={styles.emptyText}>No ladder opponents yet.</Text>
-          )}
-          {bots
-            .filter((bot) => bot.name?.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-            .map((bot) => {
-              const beaten = beatenBotIds.has(bot.id)
-
-              return (
-                <TouchableOpacity
-                  key={bot.id}
-                  style={styles.clubCard}
-                  onPress={() => router.push(`/ladder/${bot.id}/track`)}
-                >
-                  <View style={styles.clubIcon}>
-                    <Text style={styles.clubIconText}>
-                      {bot.name?.[0]?.toUpperCase() ?? '?'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.clubInfo}>
-                    <Text style={styles.clubName}>{bot.name}</Text>
-                    <Text style={styles.raceMeta}>
-                      {bot.distance_km} km in {formatDuration(bot.time_seconds)}
-                    </Text>
-                  </View>
-
-                  {beaten ? (
-                    <Text style={styles.joinedLabel}>Beaten</Text>
-                  ) : (
-                    <View style={styles.joinButton}>
-                      <Text style={styles.joinButtonText}>Challenge</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )
-            })}
         </>
       )}
     </ScrollView>

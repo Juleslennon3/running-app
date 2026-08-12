@@ -1,10 +1,11 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../lib/auth-context'
 import { supabase } from '../lib/supabase'
-import { colors } from '../lib/theme'
+import { cardShadow, colors, sectionLabel } from '../lib/theme'
 
 export default function PendingScreen() {
   const router = useRouter()
@@ -98,7 +99,7 @@ export default function PendingScreen() {
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
-      <Text style={styles.sectionTitle}>Invites</Text>
+      <Text style={[sectionLabel, styles.firstSectionTitle]}>Invites</Text>
       {invites.length === 0 && (
         <Text style={styles.emptyText}>No pending invites.</Text>
       )}
@@ -125,7 +126,7 @@ export default function PendingScreen() {
         </View>
       ))}
 
-      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Waiting for your run</Text>
+      <Text style={[sectionLabel, styles.sectionTitleSpaced]}>Waiting for your run</Text>
       {waiting.length === 0 && (
         <Text style={styles.emptyText}>Nothing waiting on you right now.</Text>
       )}
@@ -142,7 +143,7 @@ export default function PendingScreen() {
               Ends {new Date(row.races?.end_date).toLocaleDateString()}
             </Text>
           </View>
-          <Text style={styles.waitingArrow}>›</Text>
+          <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -159,14 +160,12 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 60,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
+  firstSectionTitle: {
     marginBottom: 12,
   },
   sectionTitleSpaced: {
-    marginTop: 24,
+    marginTop: 26,
+    marginBottom: 12,
   },
   emptyText: {
     color: colors.textSecondary,
@@ -174,25 +173,19 @@ const styles = StyleSheet.create({
   },
   inviteCard: {
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    ...cardShadow,
   },
   waitingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-  },
-  waitingArrow: {
-    fontSize: 20,
-    color: colors.textSecondary,
+    ...cardShadow,
   },
   raceName: {
     fontSize: 16,

@@ -11,7 +11,7 @@ import {
 import { useSession } from '../../lib/auth-context'
 import { getLevelLabel } from '../../lib/level'
 import { supabase } from '../../lib/supabase'
-import { colors } from '../../lib/theme'
+import { cardShadow, colors, sectionLabel } from '../../lib/theme'
 
 export default function ProfileScreen() {
 
@@ -237,25 +237,29 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Your clubs</Text>
+      <Text style={[sectionLabel, styles.sectionTitle]}>Your clubs</Text>
       {myClubs.length === 0 && (
-        <Text style={styles.emptyText}>You haven't joined any clubs yet.</Text>
+        <Text style={styles.emptyText}>You haven&apos;t joined any clubs yet.</Text>
       )}
       {myClubs.map((club) => (
-        <View key={club.id} style={styles.rowCard}>
+        <TouchableOpacity key={club.id} style={styles.rowCard} onPress={() => router.push(`/club/${club.id}`)}>
           <View style={styles.rowIcon}>
             <Text style={styles.rowIconText}>{club.name?.[0]?.toUpperCase() ?? '?'}</Text>
           </View>
           <Text style={styles.rowText}>{club.name}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
 
-      <Text style={styles.sectionTitle}>Your races</Text>
+      <Text style={[sectionLabel, styles.sectionTitle]}>Your races</Text>
       {myRaces.length === 0 && (
-        <Text style={styles.emptyText}>You haven't joined any races yet.</Text>
+        <Text style={styles.emptyText}>You haven&apos;t joined any races yet.</Text>
       )}
       {myRaces.map((row: any, index) => (
-        <View key={index} style={styles.rowCard}>
+        <TouchableOpacity
+          key={index}
+          style={styles.rowCard}
+          onPress={() => router.push({ pathname: '/race/[id]', params: { id: row.race_id } })}
+        >
           <View style={styles.rowIcon}>
             <Text style={styles.rowIconText}>{row.races?.name?.[0]?.toUpperCase() ?? '?'}</Text>
           </View>
@@ -265,7 +269,7 @@ export default function ProfileScreen() {
               {row.distance_km !== null ? `${row.distance_km} km` : 'No result logged'}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
     </ScrollView>
   )
@@ -288,17 +292,15 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: '#1c2b12',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLetter: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: 'bold',
     color: colors.accent,
   },
@@ -318,9 +320,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     color: colors.textPrimary,
+    letterSpacing: -0.3,
   },
   email: {
     fontSize: 13,
@@ -403,12 +406,11 @@ const styles = StyleSheet.create({
   statsCard: {
     flexDirection: 'row',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 18,
     paddingVertical: 22,
     paddingHorizontal: 12,
     marginBottom: 16,
+    ...cardShadow,
   },
   statBox: {
     flex: 1,
@@ -433,11 +435,10 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 24,
+    ...cardShadow,
   },
   formTitle: {
     fontSize: 13,
@@ -473,11 +474,8 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
     marginTop: 8,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptyText: {
     color: colors.textSecondary,
@@ -488,18 +486,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     marginBottom: 10,
     gap: 12,
+    ...cardShadow,
   },
   rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.background,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: '#1c2b12',
     alignItems: 'center',
     justifyContent: 'center',
   },

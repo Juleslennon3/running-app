@@ -13,7 +13,7 @@ import { UserRow } from '../../components/user-row'
 import { useSession } from '../../lib/auth-context'
 import { followUser, unfollowUser } from '../../lib/follow'
 import { supabase } from '../../lib/supabase'
-import { colors } from '../../lib/theme'
+import { cardShadow, colors } from '../../lib/theme'
 
 const CATEGORIES: { key: 'clubs' | 'races' | 'people'; label: string }[] = [
   { key: 'clubs', label: 'Clubs' },
@@ -284,13 +284,13 @@ export default function ExploreScreen() {
                   <Text style={styles.joinedLabel}>Joined</Text>
                 ) : (
                   <TouchableOpacity
-                    style={styles.joinButton}
+                    style={styles.joinButtonFilled}
                     onPress={(e) => {
                       e.stopPropagation()
                       joinClub(club.id)
                     }}
                   >
-                    <Text style={styles.joinButtonText}>Join</Text>
+                    <Text style={styles.joinButtonFilledText}>Join</Text>
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
@@ -359,10 +359,11 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   title: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    marginBottom: 16,
+    letterSpacing: -0.5,
+    marginBottom: 20,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -422,18 +423,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
     marginTop: 12,
     gap: 12,
+    ...cardShadow,
   },
   clubIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: colors.background,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#1c2b12',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -455,25 +455,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  joinButton: {
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 10,
+  joinButtonFilled: {
+    backgroundColor: colors.accent,
+    borderRadius: 20,
     paddingVertical: 7,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
-  joinButtonText: {
-    color: colors.textPrimary,
+  joinButtonFilledText: {
+    color: colors.background,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   raceCard: {
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
     marginBottom: 10,
+    ...cardShadow,
   },
   raceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   raceName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, flex: 1 },

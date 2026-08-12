@@ -10,7 +10,7 @@ import {
 
 import { useSession } from '../../../lib/auth-context'
 import { supabase } from '../../../lib/supabase'
-import { colors } from '../../../lib/theme'
+import { cardShadow, colors, sectionLabel } from '../../../lib/theme'
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -218,7 +218,7 @@ export default function RaceDetailScreen() {
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Leaderboard</Text>
+      <Text style={[sectionLabel, styles.sectionTitle]}>Leaderboard</Text>
       {sortedLeaderboard.length === 0 && (
         <Text style={styles.emptyText}>No results yet.</Text>
       )}
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   container: { padding: 28, paddingTop: 20, paddingBottom: 80 },
   emptyContainer: { flex: 1, padding: 28, paddingTop: 70, backgroundColor: colors.background },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary, flex: 1 },
+  title: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary, letterSpacing: -0.5, flex: 1 },
   subtitle: { fontSize: 14, color: colors.textSecondary },
   raceClub: { fontSize: 13, color: colors.accent, fontWeight: '600', marginTop: 8 },
   raceDates: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
@@ -263,16 +263,16 @@ const styles = StyleSheet.create({
   badgeActiveText: { color: colors.accent, fontSize: 11, fontWeight: '600' },
   badgeEnded: { backgroundColor: colors.card, borderRadius: 20, paddingVertical: 4, paddingHorizontal: 10 },
   badgeEndedText: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
-  primaryButton: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
-  primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
-  submitCard: { backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border, borderRadius: 14, padding: 16, marginBottom: 24 },
+  primaryButton: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 20, ...cardShadow },
+  primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 15 },
+  submitCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 24, ...cardShadow },
   submitLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 10 },
   myTimeText: { color: colors.textPrimary, fontSize: 28, fontWeight: 'bold' },
   myDnfText: { color: colors.danger, fontSize: 20, fontWeight: 'bold' },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 12 },
+  sectionTitle: { marginBottom: 12 },
   emptyText: { color: colors.textSecondary, fontSize: 13 },
-  leaderboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 10, gap: 12, borderRadius: 8 },
-  leaderboardRowYou: { backgroundColor: '#161a10' },
+  leaderboardRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, paddingVertical: 12, paddingHorizontal: 12, gap: 12, borderRadius: 14, marginBottom: 8, ...cardShadow },
+  leaderboardRowYou: { borderWidth: 1, borderColor: colors.accent },
   rankBadge: {
     width: 24,
     height: 24,

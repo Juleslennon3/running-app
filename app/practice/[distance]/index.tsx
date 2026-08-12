@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSession } from '../../../lib/auth-context'
 import { DISTANCE_CATEGORIES } from '../../../lib/distance-categories'
 import { supabase } from '../../../lib/supabase'
-import { colors } from '../../../lib/theme'
+import { cardShadow, colors } from '../../../lib/theme'
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   container: { padding: 28, paddingBottom: 80 },
   emptyContainer: { flex: 1, padding: 28, paddingTop: 70, backgroundColor: colors.background },
   emptyText: { color: colors.textSecondary, fontSize: 14 },
-  title: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary },
+  title: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary, letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 6, marginBottom: 28 },
   trail: { position: 'relative' },
   trailLine: {
@@ -145,6 +145,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
   nodeBeaten: {
     backgroundColor: colors.accent,

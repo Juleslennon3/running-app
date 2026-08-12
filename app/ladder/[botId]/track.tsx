@@ -4,7 +4,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../../lib/auth-context'
 import { supabase } from '../../../lib/supabase'
-import { colors } from '../../../lib/theme'
+import { cardShadow, colors } from '../../../lib/theme'
 import { useGpsTracking } from '../../../lib/use-gps-tracking'
 
 function formatDuration(totalSeconds: number) {
@@ -185,6 +185,7 @@ const styles = StyleSheet.create({
     height: 120,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
   startButtonText: {
     color: colors.background,
@@ -199,6 +200,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 40,
+    ...cardShadow,
   },
   finishButtonText: {
     color: colors.textPrimary,
@@ -237,12 +239,12 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   secondaryButton: {
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 28,
     marginTop: 10,
+    ...cardShadow,
   },
   secondaryButtonText: {
     color: colors.textPrimary,

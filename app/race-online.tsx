@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../lib/auth-context'
 import { DISTANCE_CATEGORIES } from '../lib/distance-categories'
 import { supabase } from '../lib/supabase'
-import { colors } from '../lib/theme'
+import { cardShadow, colors } from '../lib/theme'
 
 const POLL_MS = 2500
 
@@ -139,6 +139,9 @@ export default function RaceOnlineScreen() {
         </>
       ) : (
         <View style={styles.searchingContainer}>
+          <View style={styles.searchingRing}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
           <Text style={styles.searchingTitle}>Searching…</Text>
           <Text style={styles.subtitle}>Looking for someone near your ELO.</Text>
 
@@ -152,36 +155,45 @@ export default function RaceOnlineScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 28, paddingTop: 40 },
-  title: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary },
+  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 40 },
+  title: { fontSize: 30, fontWeight: 'bold', color: colors.textPrimary, letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 6, marginBottom: 24 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  chip: { borderWidth: 0.5, borderColor: colors.border, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14 },
-  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chip: { backgroundColor: colors.card, borderRadius: 20, paddingVertical: 9, paddingHorizontal: 16, ...cardShadow },
+  chipActive: { backgroundColor: colors.accent },
   chipText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
   chipTextActive: { color: colors.background },
   input: {
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     marginBottom: 20,
     color: colors.textPrimary,
     fontSize: 15,
+    ...cardShadow,
   },
   message: { color: colors.textSecondary, fontSize: 13, marginBottom: 16 },
-  primaryButton: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
+  primaryButton: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center', ...cardShadow },
+  primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 15 },
   searchingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  searchingRing: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    ...cardShadow,
+  },
   searchingTitle: { fontSize: 22, fontWeight: 'bold', color: colors.accent, marginBottom: 8 },
   cancelButton: {
     marginTop: 30,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 30,
+    ...cardShadow,
   },
   cancelButtonText: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
 })

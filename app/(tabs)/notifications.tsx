@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { useSession } from '../../lib/auth-context'
 import { supabase } from '../../lib/supabase'
-import { colors } from '../../lib/theme'
+import { cardShadow, colors } from '../../lib/theme'
 
 export default function NotificationsScreen() {
   const router = useRouter()
@@ -109,10 +109,11 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   title: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: 'bold',
     color: colors.textPrimary,
-    marginBottom: 20,
+    letterSpacing: -0.5,
+    marginBottom: 24,
   },
   emptyText: {
     color: colors.textSecondary,
@@ -122,21 +123,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16,
+    padding: 14,
     marginBottom: 10,
     gap: 12,
+    ...cardShadow,
   },
   notificationCardUnread: {
+    borderWidth: 1,
     borderColor: colors.accent,
   },
   notificationIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.background,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#1c2b12',
     alignItems: 'center',
     justifyContent: 'center',
   },

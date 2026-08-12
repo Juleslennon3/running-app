@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 
 import { supabase } from '../lib/supabase'
+import { cardShadow, colors } from '../lib/theme'
 
 export default function SignInScreen() {
 
@@ -69,10 +70,13 @@ export default function SignInScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: '#0a0b0d' }}
+      style={{ flex: 1, backgroundColor: colors.background }}
     >
       <ScrollView contentContainerStyle={styles.container}>
 
+        <View style={styles.logoMark}>
+          <Text style={styles.logoMarkText}>R</Text>
+        </View>
         <Text style={styles.logo}>RUN CLUB</Text>
         <Text style={styles.tagline}>Race your friends. Track every mile.</Text>
 
@@ -98,7 +102,7 @@ export default function SignInScreen() {
         {mode === 'signup' && (
           <TextInput
             placeholder="Username"
-            placeholderTextColor="#6b6e73"
+            placeholderTextColor={colors.textSecondary}
             value={username}
             onChangeText={setUsername}
             style={styles.input}
@@ -108,7 +112,7 @@ export default function SignInScreen() {
 
         <TextInput
           placeholder="Email"
-          placeholderTextColor="#6b6e73"
+          placeholderTextColor={colors.textSecondary}
           value={email}
           onChangeText={setEmail}
           style={styles.input}
@@ -118,7 +122,7 @@ export default function SignInScreen() {
 
         <TextInput
           placeholder="Password"
-          placeholderTextColor="#6b6e73"
+          placeholderTextColor={colors.textSecondary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -141,83 +145,90 @@ export default function SignInScreen() {
   )
 }
 
-const ACCENT = '#e8ff2e'
-const BG = '#0a0b0d'
-const CARD = '#111214'
-const BORDER = '#1e2023'
-const TEXT_PRIMARY = '#f5f5f2'
-const TEXT_SECONDARY = '#6b6e73'
-
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: 28,
-    backgroundColor: BG,
+    backgroundColor: colors.background,
+  },
+  logoMark: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: '#1c2b12',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    ...cardShadow,
+  },
+  logoMarkText: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: colors.accent,
   },
   logo: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    color: TEXT_PRIMARY,
-    letterSpacing: 1,
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
     marginBottom: 6,
   },
   tagline: {
     fontSize: 14,
-    color: TEXT_SECONDARY,
+    color: colors.textSecondary,
     marginBottom: 32,
   },
   toggleRow: {
     flexDirection: 'row',
-    backgroundColor: CARD,
-    borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: BORDER,
+    backgroundColor: colors.card,
+    borderRadius: 14,
     padding: 4,
     marginBottom: 24,
+    ...cardShadow,
   },
   toggleTab: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9,
+    paddingVertical: 11,
+    borderRadius: 11,
     alignItems: 'center',
   },
   toggleTabActive: {
-    backgroundColor: ACCENT,
+    backgroundColor: colors.accent,
   },
   toggleText: {
     fontSize: 14,
     fontWeight: '600',
-    color: TEXT_SECONDARY,
+    color: colors.textSecondary,
   },
   toggleTextActive: {
-    color: '#0a0b0d',
+    color: colors.background,
   },
   input: {
-    backgroundColor: CARD,
-    borderWidth: 0.5,
-    borderColor: BORDER,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 15,
     marginBottom: 12,
-    color: TEXT_PRIMARY,
+    color: colors.textPrimary,
     fontSize: 15,
+    ...cardShadow,
   },
   primaryButton: {
-    backgroundColor: ACCENT,
-    borderRadius: 12,
-    padding: 15,
+    backgroundColor: colors.accent,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
     marginTop: 8,
+    ...cardShadow,
   },
   primaryButtonText: {
-    color: '#0a0b0d',
+    color: colors.background,
     fontSize: 15,
     fontWeight: 'bold',
   },
   message: {
     marginTop: 18,
-    color: TEXT_SECONDARY,
+    color: colors.textSecondary,
     fontSize: 13,
     textAlign: 'center',
   },

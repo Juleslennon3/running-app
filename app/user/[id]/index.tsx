@@ -18,7 +18,7 @@ import { DISTANCE_CATEGORIES } from '../../../lib/distance-categories'
 import { followUser, unfollowUser } from '../../../lib/follow'
 import { getLevelLabel } from '../../../lib/level'
 import { supabase } from '../../../lib/supabase'
-import { colors } from '../../../lib/theme'
+import { cardShadow, colors, sectionLabel } from '../../../lib/theme'
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams()
@@ -314,25 +314,29 @@ export default function UserProfileScreen() {
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Clubs</Text>
+      <Text style={[sectionLabel, styles.sectionTitle]}>Clubs</Text>
       {clubs.length === 0 && (
         <Text style={styles.emptyText}>Not in any clubs yet.</Text>
       )}
       {clubs.map((club) => (
-        <View key={club.id} style={styles.rowCard}>
+        <TouchableOpacity key={club.id} style={styles.rowCard} onPress={() => router.push(`/club/${club.id}`)}>
           <View style={styles.rowIcon}>
             <Text style={styles.rowIconText}>{club.name?.[0]?.toUpperCase() ?? '?'}</Text>
           </View>
           <Text style={styles.rowText}>{club.name}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
 
-      <Text style={styles.sectionTitle}>Races</Text>
+      <Text style={[sectionLabel, styles.sectionTitle]}>Races</Text>
       {races.length === 0 && (
         <Text style={styles.emptyText}>No races yet.</Text>
       )}
       {races.map((row: any, index) => (
-        <View key={index} style={styles.rowCard}>
+        <TouchableOpacity
+          key={index}
+          style={styles.rowCard}
+          onPress={() => router.push({ pathname: '/race/[id]', params: { id: row.race_id } })}
+        >
           <View style={styles.rowIcon}>
             <Text style={styles.rowIconText}>{row.races?.name?.[0]?.toUpperCase() ?? '?'}</Text>
           </View>
@@ -342,7 +346,7 @@ export default function UserProfileScreen() {
               {row.distance_km !== null ? `${row.distance_km} km` : 'No result logged'}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
 
       <Modal
@@ -425,17 +429,15 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: '#1c2b12',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLetter: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: 'bold',
     color: colors.accent,
   },
@@ -443,9 +445,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     color: colors.textPrimary,
+    letterSpacing: -0.3,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -499,12 +502,11 @@ const styles = StyleSheet.create({
   statsCard: {
     flexDirection: 'row',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 18,
     paddingVertical: 22,
     paddingHorizontal: 12,
     marginBottom: 16,
+    ...cardShadow,
   },
   statBox: {
     flex: 1,
@@ -529,11 +531,10 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 24,
+    ...cardShadow,
   },
   formTitle: {
     fontSize: 13,
@@ -569,11 +570,8 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
     marginTop: 8,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptyText: {
     color: colors.textSecondary,
@@ -584,18 +582,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     marginBottom: 10,
     gap: 12,
+    ...cardShadow,
   },
   rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.background,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: '#1c2b12',
     alignItems: 'center',
     justifyContent: 'center',
   },

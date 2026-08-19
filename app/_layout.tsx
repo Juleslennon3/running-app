@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -7,6 +8,7 @@ import 'react-native-reanimated';
 import { AppSplashScreen } from '@/components/app-splash-screen';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SessionProvider, useSession } from '@/lib/auth-context';
+import { pathForNotificationData, registerForPushNotificationsAsync } from '@/lib/push-notifications';
 
 const MIN_SPLASH_MS = 1200;
 
@@ -22,11 +24,29 @@ function RootNavigator() {
 const colorScheme = useColorScheme();
 const { session, isLoading } = useSession();
 const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+const router = useRouter();
 
 useEffect(() => {
 const timeout = setTimeout(() => setMinTimeElapsed(true), MIN_SPLASH_MS);
 return () => clearTimeout(timeout);
 }, []);
+
+useEffect(() => {
+if (session) {
+registerForPushNotificationsAsync(session.user.id);
+}
+}, [session]);
+
+useEffect(() => {
+const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+const data = response.notification.request.content.data as any;
+const target = data ? pathForNotificationData(data) : null;
+if (target) {
+router.push(target as any);
+}
+});
+return () => subscription.remove();
+}, [router]);
 
 if (isLoading || !minTimeElapsed) {
 return <AppSplashScreen />;

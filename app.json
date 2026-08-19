@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.juleslennon.runningapp",
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Run Club uses your location to track your distance and pace during a live race."
+        "NSLocationWhenInUseUsageDescription": "Run Club uses your location to track your distance and pace during a live race.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,7 +24,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "output": "single",
@@ -47,11 +53,25 @@
         {
           "locationWhenInUsePermission": "Run Club uses your location to track your distance and pace during a live race."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#e8ff2e"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c50d4224-6d17-40b4-8726-8aee0f3d0ced"
+      }
+    },
+    "owner": "juleslennon"
   }
 }

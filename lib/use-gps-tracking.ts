@@ -8,6 +8,10 @@ type UseGpsTrackingOptions = {
   onFinish: (result: { durationSeconds: number; distanceKm: number }) => void
 }
 
+// How far back to look when computing "current" pace, so it reflects your
+// last ~20 seconds of effort instead of the whole run's average.
+const CURRENT_PACE_WINDOW_MS = 20000
+
 function haversineDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000
   const toRad = (deg: number) => (deg * Math.PI) / 180
@@ -24,6 +28,7 @@ export function useGpsTracking({ targetDistanceKm, onFinish }: UseGpsTrackingOpt
   const [phase, setPhase] = useState<GpsTrackingPhase>('requesting')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [distanceMeters, setDistanceMeters] = useState(0)
+  const [currentPaceSecPerKm, setCurrentPaceSecPerKm] = useState<number | null>(null)
 
   const startTimeRef = useRef(0)
   const distanceMetersRef = useRef(0)
@@ -33,6 +38,7 @@ export function useGpsTracking({ targetDistanceKm, onFinish }: UseGpsTrackingOpt
   const finishedRef = useRef(false)
   const targetDistanceRef = useRef(targetDistanceKm)
   targetDistanceRef.current = targetDistanceKm
+  const paceSamplesRef = useRef<{ time: number; distance: number }[]>([])
 
   useEffect(() => {
     requestPermission()
@@ -65,12 +71,27 @@ export function useGpsTracking({ targetDistanceKm, onFinish }: UseGpsTrackingOpt
     distanceMetersRef.current = 0
     lastPointRef.current = null
     finishedRef.current = false
+    paceSamplesRef.current = [{ time: Date.now(), distance: 0 }]
     setDistanceMeters(0)
     setElapsedSeconds(0)
+    setCurrentPaceSecPerKm(null)
     setPhase('tracking')
 
     timerRef.current = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000))
+      const now = Date.now()
+      setElapsedSeconds(Math.floor((now - startTimeRef.current) / 1000))
+
+      const cutoff = now - CURRENT_PACE_WINDOW_MS
+      paceSamplesRef.current = paceSamplesRef.current.filter((s) => s.time >= cutoff)
+      if (paceSamplesRef.current.length === 0) {
+        paceSamplesRef.current.push({ time: now, distance: distanceMetersRef.current })
+      }
+
+      const oldest = paceSamplesRef.current[0]
+      const distanceDeltaKm = (distanceMetersRef.current - oldest.distance) / 1000
+      const timeDeltaSec = (now - oldest.time) / 1000
+
+      setCurrentPaceSecPerKm(distanceDeltaKm > 0.005 && timeDeltaSec > 2 ? timeDeltaSec / distanceDeltaKm : null)
     }, 1000)
 
     watchSubscriptionRef.current = await Location.watchPositionAsync(
@@ -93,6 +114,7 @@ export function useGpsTracking({ targetDistanceKm, onFinish }: UseGpsTrackingOpt
           if (delta > 1) {
             distanceMetersRef.current += delta
             setDistanceMeters(distanceMetersRef.current)
+            paceSamplesRef.current.push({ time: Date.now(), distance: distanceMetersRef.current })
           }
         }
 
@@ -122,5 +144,5 @@ export function useGpsTracking({ targetDistanceKm, onFinish }: UseGpsTrackingOpt
     onFinish({ durationSeconds: finalDurationSeconds, distanceKm: finalDistanceKm })
   }
 
-  return { phase, elapsedSeconds, distanceMeters, start, finish }
+  return { phase, elapsedSeconds, distanceMeters, currentPaceSecPerKm, start, finish }
 }

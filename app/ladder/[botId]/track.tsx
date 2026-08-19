@@ -3,23 +3,10 @@ import { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../../lib/auth-context'
+import { formatDuration, formatPaceFromSecPerKm } from '../../../lib/format'
 import { supabase } from '../../../lib/supabase'
 import { cardShadow, colors } from '../../../lib/theme'
 import { useGpsTracking } from '../../../lib/use-gps-tracking'
-
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
-
-function formatPace(elapsedSeconds: number, distanceKm: number) {
-  if (distanceKm <= 0) return '—'
-  const secPerKm = elapsedSeconds / distanceKm
-  const minutes = Math.floor(secPerKm / 60)
-  const seconds = Math.round(secPerKm % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')} /km`
-}
 
 export default function LadderTrackScreen() {
   const { botId } = useLocalSearchParams()
@@ -29,7 +16,7 @@ export default function LadderTrackScreen() {
   const [bot, setBot] = useState<any>(null)
   const [result, setResult] = useState<{ durationSeconds: number; distanceKm: number; beatBot: boolean; dnf: boolean } | null>(null)
 
-  const { phase, elapsedSeconds, distanceMeters, start, finish } = useGpsTracking({
+  const { phase, elapsedSeconds, distanceMeters, currentPaceSecPerKm, start, finish } = useGpsTracking({
     targetDistanceKm: bot?.distance_km ?? null,
     onFinish: handleFinish,
   })
@@ -118,13 +105,42 @@ export default function LadderTrackScreen() {
 
   if (phase === 'tracking') {
     const distanceKm = distanceMeters / 1000
+    const remainingKm = Math.max(0, bot.distance_km - distanceKm)
+    const etaSeconds = currentPaceSecPerKm ? remainingKm * currentPaceSecPerKm : null
+
+    const botPaceSecPerKm = bot.time_seconds / bot.distance_km
+    const botExpectedSecondsAtDistance = distanceKm * botPaceSecPerKm
+    const deltaSeconds = Math.round(botExpectedSecondsAtDistance - elapsedSeconds)
+    const ahead = deltaSeconds >= 0
 
     return (
       <View style={styles.centerContainer}>
+        {distanceKm > 0.02 && (
+          <View style={[styles.rankPill, !ahead && styles.rankPillBehind]}>
+            <Text style={[styles.rankPillText, !ahead && styles.rankPillTextBehind]}>
+              {Math.abs(deltaSeconds)}s {ahead ? 'ahead of' : 'behind'} {bot.name}
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.liveTimer}>{formatDuration(elapsedSeconds)}</Text>
         <Text style={styles.liveDistance}>{distanceKm.toFixed(2)} km</Text>
         <Text style={styles.liveTarget}>of {bot.distance_km} km · beat {formatDuration(bot.time_seconds)}</Text>
-        <Text style={styles.livePace}>{formatPace(elapsedSeconds, distanceKm)}</Text>
+
+        <View style={styles.statsGrid}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{remainingKm.toFixed(2)}</Text>
+            <Text style={styles.statLabel}>km left</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
+            <Text style={styles.statLabel}>current /km</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{etaSeconds != null ? formatDuration(etaSeconds) : '—'}</Text>
+            <Text style={styles.statLabel}>est. left</Text>
+          </View>
+        </View>
 
         <TouchableOpacity style={styles.finishButton} onPress={finish}>
           <Text style={styles.finishButtonText}>Finish</Text>
@@ -207,6 +223,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  rankPill: {
+    backgroundColor: colors.accent,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+    ...cardShadow,
+  },
+  rankPillBehind: {
+    backgroundColor: colors.danger,
+  },
+  rankPillText: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  rankPillTextBehind: {
+    color: colors.textPrimary,
+  },
   liveTimer: {
     fontSize: 56,
     fontWeight: 'bold',
@@ -223,10 +258,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
-  livePace: {
-    fontSize: 15,
+  statsGrid: {
+    flexDirection: 'row',
+    marginTop: 28,
+    gap: 12,
+  },
+  statBox: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    minWidth: 88,
+    ...cardShadow,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 8,
+    marginTop: 4,
   },
   resultRank: {
     fontSize: 32,

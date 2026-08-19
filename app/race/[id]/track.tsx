@@ -1,25 +1,15 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../../lib/auth-context'
-import { useGpsTracking } from '../../../lib/use-gps-tracking'
+import { formatDuration, formatPaceFromSecPerKm } from '../../../lib/format'
 import { supabase } from '../../../lib/supabase'
 import { cardShadow, colors } from '../../../lib/theme'
+import { useGpsTracking } from '../../../lib/use-gps-tracking'
 
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
-
-function formatPace(elapsedSeconds: number, distanceKm: number) {
-  if (distanceKm <= 0) return '—'
-  const secPerKm = elapsedSeconds / distanceKm
-  const minutes = Math.floor(secPerKm / 60)
-  const seconds = Math.round(secPerKm % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')} /km`
-}
+const LIVE_UPDATE_MS = 5000
 
 export default function TrackRaceScreen() {
   const { id } = useLocalSearchParams()
@@ -28,15 +18,40 @@ export default function TrackRaceScreen() {
 
   const [targetDistanceKm, setTargetDistanceKm] = useState<number | null>(null)
   const [result, setResult] = useState<{ durationSeconds: number; distanceKm: number; rank: number; totalFinished: number; dnf: boolean } | null>(null)
+  const [liveRank, setLiveRank] = useState<{ rank: number; total: number } | null>(null)
 
-  const { phase, elapsedSeconds, distanceMeters, start, finish } = useGpsTracking({
+  const { phase, elapsedSeconds, distanceMeters, currentPaceSecPerKm, start, finish } = useGpsTracking({
     targetDistanceKm,
     onFinish: handleFinish,
   })
 
+  const distanceMetersRef = useRef(0)
+  useEffect(() => {
+    distanceMetersRef.current = distanceMeters
+  }, [distanceMeters])
+
   useEffect(() => {
     fetchTargetDistance()
   }, [])
+
+  useEffect(() => {
+    if (phase !== 'tracking') return
+
+    const interval = setInterval(async () => {
+      const liveDistanceKm = Number((distanceMetersRef.current / 1000).toFixed(3))
+
+      await supabase
+        .from('race_participants')
+        .update({ distance_km: liveDistanceKm })
+        .eq('race_id', id)
+        .eq('user_id', session?.user.id)
+        .is('duration_seconds', null)
+
+      fetchLiveRank()
+    }, LIVE_UPDATE_MS)
+
+    return () => clearInterval(interval)
+  }, [phase, id, session])
 
   async function fetchTargetDistance() {
     const { data, error } = await supabase
@@ -49,6 +64,36 @@ export default function TrackRaceScreen() {
 
     if (!error && data) {
       setTargetDistanceKm(data.target_distance_km)
+    }
+  }
+
+  async function fetchLiveRank() {
+    const { data, error } = await supabase
+      .from('race_participants')
+      .select('user_id, distance_km, duration_seconds')
+      .eq('race_id', id)
+
+    console.log("LIVE RANK ERROR:", error)
+
+    if (error || !data) return
+
+    function isDnf(r: { duration_seconds: number | null; distance_km: number | null }) {
+      return r.duration_seconds !== null && !!targetDistanceKm && (r.distance_km ?? 0) < targetDistanceKm
+    }
+
+    const validFinishers = data
+      .filter((r: any) => r.duration_seconds !== null && !isDnf(r))
+      .sort((a: any, b: any) => a.duration_seconds - b.duration_seconds)
+    const inProgress = data
+      .filter((r: any) => r.duration_seconds === null)
+      .sort((a: any, b: any) => (b.distance_km ?? 0) - (a.distance_km ?? 0))
+    const dnfd = data.filter((r: any) => isDnf(r))
+
+    const ordered = [...validFinishers, ...inProgress, ...dnfd]
+    const myIndex = ordered.findIndex((r: any) => r.user_id === session?.user.id)
+
+    if (myIndex >= 0) {
+      setLiveRank({ rank: myIndex + 1, total: ordered.length })
     }
   }
 
@@ -138,15 +183,38 @@ export default function TrackRaceScreen() {
 
   if (phase === 'tracking') {
     const distanceKm = distanceMeters / 1000
+    const remainingKm = targetDistanceKm != null ? Math.max(0, targetDistanceKm - distanceKm) : null
+    const etaSeconds = remainingKm != null && currentPaceSecPerKm ? remainingKm * currentPaceSecPerKm : null
 
     return (
       <View style={styles.centerContainer}>
+        {liveRank && (
+          <View style={styles.rankPill}>
+            <MaterialIcons name="emoji-events" size={14} color={colors.background} />
+            <Text style={styles.rankPillText}>{rankLabel(liveRank.rank)} of {liveRank.total}</Text>
+          </View>
+        )}
+
         <Text style={styles.liveTimer}>{formatDuration(elapsedSeconds)}</Text>
         <Text style={styles.liveDistance}>{distanceKm.toFixed(2)} km</Text>
         {targetDistanceKm && (
           <Text style={styles.liveTarget}>of {targetDistanceKm} km target</Text>
         )}
-        <Text style={styles.livePace}>{formatPace(elapsedSeconds, distanceKm)}</Text>
+
+        <View style={styles.statsGrid}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{remainingKm != null ? remainingKm.toFixed(2) : '—'}</Text>
+            <Text style={styles.statLabel}>km left</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
+            <Text style={styles.statLabel}>current /km</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{etaSeconds != null ? formatDuration(etaSeconds) : '—'}</Text>
+            <Text style={styles.statLabel}>est. left</Text>
+          </View>
+        </View>
 
         <TouchableOpacity style={styles.finishButton} onPress={finish}>
           <Text style={styles.finishButtonText}>Finish</Text>
@@ -229,6 +297,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  rankPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accent,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+    ...cardShadow,
+  },
+  rankPillText: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
   liveTimer: {
     fontSize: 56,
     fontWeight: 'bold',
@@ -245,10 +329,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
-  livePace: {
-    fontSize: 15,
+  statsGrid: {
+    flexDirection: 'row',
+    marginTop: 28,
+    gap: 12,
+  },
+  statBox: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    minWidth: 88,
+    ...cardShadow,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 8,
+    marginTop: 4,
   },
   resultRank: {
     fontSize: 40,

@@ -3,23 +3,10 @@ import { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../../lib/auth-context'
+import { formatDuration, formatPaceFromSecPerKm } from '../../../lib/format'
 import { supabase } from '../../../lib/supabase'
 import { cardShadow, colors } from '../../../lib/theme'
 import { useGpsTracking } from '../../../lib/use-gps-tracking'
-
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
-
-function formatPace(elapsedSeconds: number, distanceKm: number) {
-  if (distanceKm <= 0) return '—'
-  const secPerKm = elapsedSeconds / distanceKm
-  const minutes = Math.floor(secPerKm / 60)
-  const seconds = Math.round(secPerKm % 60)
-  return `${minutes}:${seconds.toString().padStart(2, '0')} /km`
-}
 
 export default function WorkoutTrackScreen() {
   const { id } = useLocalSearchParams()
@@ -31,7 +18,7 @@ export default function WorkoutTrackScreen() {
 
   const targetDistanceKm = workout ? workout.reps * workout.distance_per_rep_km : null
 
-  const { phase, elapsedSeconds, distanceMeters, start, finish } = useGpsTracking({
+  const { phase, elapsedSeconds, distanceMeters, currentPaceSecPerKm, start, finish } = useGpsTracking({
     targetDistanceKm,
     onFinish: handleFinish,
   })
@@ -114,6 +101,8 @@ export default function WorkoutTrackScreen() {
   if (phase === 'tracking') {
     const distanceKm = distanceMeters / 1000
     const currentRep = Math.min(workout.reps, Math.floor(distanceKm / workout.distance_per_rep_km) + 1)
+    const remainingKm = targetDistanceKm != null ? Math.max(0, targetDistanceKm - distanceKm) : null
+    const etaSeconds = remainingKm != null && currentPaceSecPerKm ? remainingKm * currentPaceSecPerKm : null
 
     return (
       <View style={styles.centerContainer}>
@@ -121,7 +110,21 @@ export default function WorkoutTrackScreen() {
         <Text style={styles.liveTimer}>{formatDuration(elapsedSeconds)}</Text>
         <Text style={styles.liveDistance}>{distanceKm.toFixed(2)} km</Text>
         <Text style={styles.liveTarget}>of {(workout.reps * workout.distance_per_rep_km).toFixed(1)} km target</Text>
-        <Text style={styles.livePace}>{formatPace(elapsedSeconds, distanceKm)}</Text>
+
+        <View style={styles.statsGrid}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{remainingKm != null ? remainingKm.toFixed(2) : '—'}</Text>
+            <Text style={styles.statLabel}>km left</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
+            <Text style={styles.statLabel}>current /km</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{etaSeconds != null ? formatDuration(etaSeconds) : '—'}</Text>
+            <Text style={styles.statLabel}>est. left</Text>
+          </View>
+        </View>
 
         <TouchableOpacity style={styles.finishButton} onPress={finish}>
           <Text style={styles.finishButtonText}>Finish</Text>
@@ -224,10 +227,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
-  livePace: {
-    fontSize: 15,
+  statsGrid: {
+    flexDirection: 'row',
+    marginTop: 28,
+    gap: 12,
+  },
+  statBox: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    minWidth: 88,
+    ...cardShadow,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 11,
     color: colors.textSecondary,
-    marginTop: 8,
+    marginTop: 4,
   },
   resultTitle: {
     fontSize: 28,

@@ -11,7 +11,7 @@ import {
 import { useSession } from '../../lib/auth-context'
 import { getLevelLabel } from '../../lib/level'
 import { supabase } from '../../lib/supabase'
-import { cardShadow, colors, sectionLabel } from '../../lib/theme'
+import { avatarColors, cardShadow, colors, sectionLabel } from '../../lib/theme'
 
 export default function ProfileScreen() {
 
@@ -153,8 +153,8 @@ export default function ProfileScreen() {
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
 
       <View style={styles.profileHeader}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarLetter}>
+        <View style={[styles.avatarCircle, { backgroundColor: avatarColors(username).bg }]}>
+          <Text style={[styles.avatarLetter, { color: avatarColors(username).text }]}>
             {username?.[0]?.toUpperCase() ?? '?'}
           </Text>
         </View>

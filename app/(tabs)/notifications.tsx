@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { useSession } from '../../lib/auth-context'
 import { supabase } from '../../lib/supabase'
-import { cardShadow, colors } from '../../lib/theme'
+import { avatarColors, cardShadow, colors } from '../../lib/theme'
 
 export default function NotificationsScreen() {
   const router = useRouter()
@@ -20,7 +20,7 @@ export default function NotificationsScreen() {
   async function fetchNotifications() {
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, type, is_read, created_at, race_id, profiles!notifications_actor_id_fkey(username), races(name)')
+      .select('id, type, is_read, created_at, race_id, workout_id, profiles!notifications_actor_id_fkey(username), races(name), workouts(name)')
       .eq('user_id', session?.user.id)
       .order('created_at', { ascending: false })
 
@@ -54,6 +54,10 @@ export default function NotificationsScreen() {
       return `You've been matched with ${actorName} in ${notification.races?.name || 'a race'}`
     }
 
+    if (notification.type === 'workout_assigned') {
+      return `${actorName} assigned you ${notification.workouts?.name || 'a workout'}`
+    }
+
     return `${actorName} invited you to ${notification.races?.name || 'a race'}`
   }
 
@@ -62,6 +66,8 @@ export default function NotificationsScreen() {
       router.push('/invites')
     } else if (notification.type === 'race_match' && notification.race_id) {
       router.push({ pathname: '/race/[id]', params: { id: notification.race_id } })
+    } else if (notification.type === 'workout_assigned' && notification.workout_id) {
+      router.push({ pathname: '/workout/[id]', params: { id: notification.workout_id } })
     }
   }
 
@@ -79,10 +85,10 @@ export default function NotificationsScreen() {
           key={notification.id}
           style={[styles.notificationCard, !notification.is_read && styles.notificationCardUnread]}
           onPress={() => handlePress(notification)}
-          activeOpacity={notification.type === 'race_invite' || notification.type === 'race_match' ? 0.7 : 1}
+          activeOpacity={['race_invite', 'race_match', 'workout_assigned'].includes(notification.type) ? 0.7 : 1}
         >
-          <View style={styles.notificationIcon}>
-            <Text style={styles.notificationIconText}>
+          <View style={[styles.notificationIcon, { backgroundColor: avatarColors(notification.profiles?.username).bg }]}>
+            <Text style={[styles.notificationIconText, { color: avatarColors(notification.profiles?.username).text }]}>
               {notification.profiles?.username?.[0]?.toUpperCase() ?? '?'}
             </Text>
           </View>

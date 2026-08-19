@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient'
 import { useState } from 'react'
 import {
   KeyboardAvoidingView,
@@ -11,7 +12,7 @@ import {
 } from 'react-native'
 
 import { supabase } from '../lib/supabase'
-import { cardShadow, colors } from '../lib/theme'
+import { cardShadow, colors, gradients } from '../lib/theme'
 
 export default function SignInScreen() {
 
@@ -74,9 +75,9 @@ export default function SignInScreen() {
     >
       <ScrollView contentContainerStyle={styles.container}>
 
-        <View style={styles.logoMark}>
+        <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logoMark}>
           <Text style={styles.logoMarkText}>R</Text>
-        </View>
+        </LinearGradient>
         <Text style={styles.logo}>RUN CLUB</Text>
         <Text style={styles.tagline}>Race your friends. Track every mile.</Text>
 
@@ -129,13 +130,12 @@ export default function SignInScreen() {
           style={styles.input}
         />
 
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={mode === 'login' ? logIn : signUp}
-        >
-          <Text style={styles.primaryButtonText}>
-            {mode === 'login' ? 'Log in' : 'Create account'}
-          </Text>
+        <TouchableOpacity onPress={mode === 'login' ? logIn : signUp}>
+          <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>
+              {mode === 'login' ? 'Log in' : 'Create account'}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         {message ? <Text style={styles.message}>{message}</Text> : null}

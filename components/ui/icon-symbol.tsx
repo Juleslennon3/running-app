@@ -22,6 +22,7 @@ const MAPPING = {
   'flag.fill': 'flag',
   'bell.fill': 'notifications',
   'person.fill': 'person',
+  'person.3.fill': 'groups',
 } as IconMapping;
 
 /**

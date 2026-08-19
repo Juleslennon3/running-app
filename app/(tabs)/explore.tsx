@@ -15,8 +15,7 @@ import { followUser, unfollowUser } from '../../lib/follow'
 import { supabase } from '../../lib/supabase'
 import { cardShadow, colors } from '../../lib/theme'
 
-const CATEGORIES: { key: 'clubs' | 'races' | 'people'; label: string }[] = [
-  { key: 'clubs', label: 'Clubs' },
+const CATEGORIES: { key: 'races' | 'people'; label: string }[] = [
   { key: 'races', label: 'Races' },
   { key: 'people', label: 'People' },
 ]
@@ -25,14 +24,8 @@ export default function ExploreScreen() {
 
   const { session } = useSession()
   const router = useRouter()
-  const [category, setCategory] = useState<'clubs' | 'races' | 'people'>('clubs')
+  const [category, setCategory] = useState<'races' | 'people'>('races')
   const [searchQuery, setSearchQuery] = useState('')
-  const [message, setMessage] = useState('')
-
-  // Clubs
-  const [clubName, setClubName] = useState('')
-  const [clubs, setClubs] = useState<any[]>([])
-  const [myClubIds, setMyClubIds] = useState<string[]>([])
 
   // Races
   const [openRaces, setOpenRaces] = useState<any[]>([])
@@ -43,8 +36,6 @@ export default function ExploreScreen() {
 
   useEffect(() => {
     if (session) {
-      fetchClubs()
-      fetchMyMemberships()
       fetchOpenRaces()
       fetchMyFollowingIds()
     }
@@ -66,76 +57,6 @@ export default function ExploreScreen() {
 
     return () => clearTimeout(timeout)
   }, [searchQuery, category, session])
-
-  async function fetchClubs() {
-    const { data, error } = await supabase
-      .from('clubs')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    console.log("FETCH CLUBS DATA:", data)
-    console.log("FETCH CLUBS ERROR:", error)
-
-    if (!error) {
-      setClubs(data)
-    }
-  }
-
-  async function createClub() {
-    console.log("CREATE CLUB PRESSED")
-
-    const { data, error } = await supabase
-      .from('clubs')
-      .insert({
-        name: clubName.trim(),
-        created_by: session?.user.id,
-      })
-
-    console.log("CLUB DATA:", data)
-    console.log("CLUB ERROR:", error)
-
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage('Club created!')
-      setClubName('')
-      fetchClubs()
-    }
-  }
-
-  async function joinClub(clubId: string) {
-    console.log("JOIN CLUB PRESSED:", clubId)
-
-    const { data, error } = await supabase
-      .from('club_members')
-      .insert({
-        club_id: clubId,
-        user_id: session?.user.id,
-      })
-
-    console.log("JOIN DATA:", data)
-    console.log("JOIN ERROR:", error)
-
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage('Joined club!')
-      fetchMyMemberships()
-    }
-  }
-
-  async function fetchMyMemberships() {
-    const { data, error } = await supabase
-      .from('club_members')
-      .select('club_id')
-      .eq('user_id', session?.user.id)
-
-    console.log("MY MEMBERSHIPS:", data)
-
-    if (!error && data) {
-      setMyClubIds(data.map((row) => row.club_id))
-    }
-  }
 
   async function fetchOpenRaces() {
     const { data, error } = await supabase
@@ -209,10 +130,6 @@ export default function ExploreScreen() {
 
   if (!session) return null
 
-  const filteredClubs = clubs.filter((c) =>
-    c.name?.toLowerCase().includes(searchQuery.trim().toLowerCase())
-  )
-
   const filteredRaces = openRaces
     .filter((r) => getRaceStatus(r.end_date) === 'Active')
     .filter((r) => r.name?.toLowerCase().includes(searchQuery.trim().toLowerCase()))
@@ -243,61 +160,6 @@ export default function ExploreScreen() {
         style={styles.searchInput}
         autoCapitalize="none"
       />
-
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-
-      {category === 'clubs' && (
-        <>
-          <View style={styles.createRow}>
-            <TextInput
-              placeholder="New club name"
-              placeholderTextColor={colors.textSecondary}
-              value={clubName}
-              onChangeText={setClubName}
-              style={styles.input}
-            />
-            <TouchableOpacity style={styles.createButton} onPress={createClub}>
-              <Text style={styles.createButtonText}>Create</Text>
-            </TouchableOpacity>
-          </View>
-
-          {filteredClubs.map((club) => {
-            const alreadyJoined = myClubIds.includes(club.id)
-
-            return (
-              <TouchableOpacity
-                key={club.id}
-                style={styles.clubCard}
-                onPress={() => router.push(`/club/${club.id}`)}
-              >
-                <View style={styles.clubIcon}>
-                  <Text style={styles.clubIconText}>
-                    {club.name?.[0]?.toUpperCase() ?? '?'}
-                  </Text>
-                </View>
-
-                <View style={styles.clubInfo}>
-                  <Text style={styles.clubName}>{club.name}</Text>
-                </View>
-
-                {alreadyJoined ? (
-                  <Text style={styles.joinedLabel}>Joined</Text>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.joinButtonFilled}
-                    onPress={(e) => {
-                      e.stopPropagation()
-                      joinClub(club.id)
-                    }}
-                  >
-                    <Text style={styles.joinButtonFilledText}>Join</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            )
-          })}
-        </>
-      )}
 
       {category === 'races' && (
         <>
@@ -384,87 +246,9 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 14,
   },
-  createRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  createButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
-  },
-  createButtonText: {
-    color: colors.background,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  message: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginBottom: 16,
-  },
   emptyText: {
     color: colors.textSecondary,
     fontSize: 13,
-  },
-  clubCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 12,
-    gap: 12,
-    ...cardShadow,
-  },
-  clubIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: '#1c2b12',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clubIconText: {
-    color: colors.accent,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  clubInfo: {
-    flex: 1,
-  },
-  clubName: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  joinedLabel: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  joinButtonFilled: {
-    backgroundColor: colors.accent,
-    borderRadius: 20,
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-  },
-  joinButtonFilledText: {
-    color: colors.background,
-    fontSize: 13,
-    fontWeight: 'bold',
   },
   raceCard: {
     backgroundColor: colors.card,

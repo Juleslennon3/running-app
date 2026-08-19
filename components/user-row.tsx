@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
-import { colors } from '../lib/theme'
+import { avatarColors, cardShadow, colors } from '../lib/theme'
 import { FollowButton } from './follow-button'
 
 type UserRowProps = {
@@ -11,10 +11,12 @@ type UserRowProps = {
 }
 
 export function UserRow({ username, isFollowing, onToggleFollow, onPress }: UserRowProps) {
+  const avatar = avatarColors(username)
+
   return (
     <TouchableOpacity style={styles.rowCard} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.rowIcon}>
-        <Text style={styles.rowIconText}>{username?.[0]?.toUpperCase() ?? '?'}</Text>
+      <View style={[styles.rowIcon, { backgroundColor: avatar.bg }]}>
+        <Text style={[styles.rowIconText, { color: avatar.text }]}>{username?.[0]?.toUpperCase() ?? '?'}</Text>
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowText}>{username}</Text>
@@ -29,25 +31,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     marginBottom: 10,
     gap: 12,
+    ...cardShadow,
   },
   rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: colors.background,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowIconText: {
-    color: colors.accent,
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 14,
   },
   rowText: {
     fontSize: 14,

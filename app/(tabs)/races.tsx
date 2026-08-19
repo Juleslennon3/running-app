@@ -1,12 +1,12 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../lib/auth-context'
-import { DISTANCE_CATEGORIES } from '../../lib/distance-categories'
 import { supabase } from '../../lib/supabase'
-import { cardShadow, colors, sectionLabel } from '../../lib/theme'
+import { cardShadow, colors, gradients } from '../../lib/theme'
 
 export default function RaceScreen() {
   const router = useRouter()
@@ -56,32 +56,31 @@ export default function RaceScreen() {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.onlineCard} onPress={() => router.push('/race-online')}>
-        <View style={styles.onlineIconWrap}>
-          <MaterialIcons name="bolt" size={26} color={colors.background} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.onlineTitle}>Race online</Text>
-          <Text style={styles.onlineSubtitle}>Get matched with someone near your ELO</Text>
-        </View>
-        <MaterialIcons name="arrow-forward" size={22} color={colors.background} />
+      <TouchableOpacity style={styles.cardShadowWrap} onPress={() => router.push('/race-online')}>
+        <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.onlineCard}>
+          <View style={styles.onlineIconWrap}>
+            <MaterialIcons name="bolt" size={26} color={colors.background} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.onlineTitle}>Race online</Text>
+            <Text style={styles.onlineSubtitle}>Get matched with someone near your ELO</Text>
+          </View>
+          <MaterialIcons name="arrow-forward" size={22} color={colors.background} />
+        </LinearGradient>
       </TouchableOpacity>
 
-      <Text style={[sectionLabel, styles.sectionSpaced]}>Practice</Text>
-      <Text style={styles.sectionSubtitle}>Race bots offline. Doesn&apos;t affect your ELO.</Text>
-
-      <View style={styles.practiceGrid}>
-        {DISTANCE_CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.slug}
-            style={styles.practiceCard}
-            onPress={() => router.push(`/practice/${cat.slug}`)}
-          >
-            <MaterialIcons name="directions-run" size={22} color={colors.accent} />
-            <Text style={styles.practiceLabel}>{cat.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <TouchableOpacity style={[styles.cardShadowWrap, styles.offlineShadowWrap]} onPress={() => router.push('/practice')}>
+        <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.offlineCard}>
+          <View style={styles.offlineIconWrap}>
+            <MaterialIcons name="terrain" size={26} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.offlineTitle}>Race offline</Text>
+            <Text style={styles.offlineSubtitle}>Beat the bot ladder. Doesn&apos;t affect your ELO</Text>
+          </View>
+          <MaterialIcons name="arrow-forward" size={22} color={colors.textSecondary} />
+        </LinearGradient>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.pendingLink} onPress={() => router.push('/invites')}>
         <Text style={styles.pendingLinkText}>View pending races</Text>
@@ -109,15 +108,18 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   pendingBadgeText: { color: colors.accent, fontSize: 14, fontWeight: '600', flex: 1 },
+  cardShadowWrap: {
+    borderRadius: 18,
+    marginBottom: 16,
+    ...cardShadow,
+  },
+  offlineShadowWrap: { marginBottom: 24 },
   onlineCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: colors.accent,
     borderRadius: 18,
     padding: 20,
-    marginBottom: 32,
-    ...cardShadow,
   },
   onlineIconWrap: {
     width: 46,
@@ -129,19 +131,23 @@ const styles = StyleSheet.create({
   },
   onlineTitle: { fontSize: 18, fontWeight: 'bold', color: colors.background },
   onlineSubtitle: { fontSize: 13, color: colors.background, marginTop: 4, opacity: 0.8 },
-  sectionSpaced: { marginTop: 4 },
-  sectionSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, marginBottom: 16 },
-  practiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  practiceCard: {
-    width: '47%',
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    paddingVertical: 24,
+  offlineCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    ...cardShadow,
+    gap: 14,
+    borderRadius: 18,
+    padding: 20,
   },
-  practiceLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  offlineIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: 'rgba(232,255,46,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
+  offlineSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
   pendingLink: {
     flexDirection: 'row',
     alignItems: 'center',

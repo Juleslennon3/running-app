@@ -22,7 +22,7 @@ return (
 
 function RootNavigator() {
 const colorScheme = useColorScheme();
-const { session, isLoading } = useSession();
+const { session, isLoading, needsOnboarding } = useSession();
 const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 const router = useRouter();
 
@@ -55,7 +55,10 @@ return <AppSplashScreen />;
 return (
 <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
 <Stack>
-<Stack.Protected guard={!!session}>
+<Stack.Protected guard={!!session && needsOnboarding}>
+<Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+</Stack.Protected>
+<Stack.Protected guard={!!session && !needsOnboarding}>
 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 <Stack.Screen name="club/[id]" options={{ title: 'Club', headerShown: true }} />
 <Stack.Screen name="race/[id]/index" options={{ title: 'Race', headerShown: true }} />

@@ -1,4 +1,3 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -189,9 +188,9 @@ export default function TrackRaceScreen() {
     return (
       <View style={styles.centerContainer}>
         {liveRank && (
-          <View style={styles.rankPill}>
-            <MaterialIcons name="emoji-events" size={14} color={colors.background} />
-            <Text style={styles.rankPillText}>{rankLabel(liveRank.rank)} of {liveRank.total}</Text>
+          <View style={styles.positionBadge}>
+            <Text style={styles.positionNumber}>{liveRank.rank}</Text>
+            <Text style={styles.positionSlash}>/{liveRank.total}</Text>
           </View>
         )}
 
@@ -206,9 +205,9 @@ export default function TrackRaceScreen() {
             <Text style={styles.statValue}>{remainingKm != null ? remainingKm.toFixed(2) : '—'}</Text>
             <Text style={styles.statLabel}>km left</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
-            <Text style={styles.statLabel}>current /km</Text>
+          <View style={[styles.statBox, styles.statBoxLive]}>
+            <Text style={[styles.statValue, styles.statValueLive]}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
+            <Text style={[styles.statLabel, styles.statLabelLive]}>pace now /km</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{etaSeconds != null ? formatDuration(etaSeconds) : '—'}</Text>
@@ -297,21 +296,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  rankPill: {
+  positionBadge: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.accent,
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    marginBottom: 20,
-    ...cardShadow,
+    alignItems: 'baseline',
+    marginBottom: 8,
   },
-  rankPillText: {
-    color: colors.background,
-    fontSize: 13,
-    fontWeight: 'bold',
+  positionNumber: {
+    fontSize: 96,
+    fontWeight: '900',
+    color: colors.accent,
+    lineHeight: 96,
+  },
+  positionSlash: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginLeft: 2,
   },
   liveTimer: {
     fontSize: 56,
@@ -343,15 +343,27 @@ const styles = StyleSheet.create({
     minWidth: 88,
     ...cardShadow,
   },
+  statBoxLive: {
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.textPrimary,
   },
+  statValueLive: {
+    fontSize: 22,
+    color: colors.accent,
+  },
   statLabel: {
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  statLabelLive: {
+    color: colors.accent,
+    fontWeight: '600',
   },
   resultRank: {
     fontSize: 40,

@@ -116,9 +116,9 @@ export default function WorkoutTrackScreen() {
             <Text style={styles.statValue}>{remainingKm != null ? remainingKm.toFixed(2) : '—'}</Text>
             <Text style={styles.statLabel}>km left</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
-            <Text style={styles.statLabel}>current /km</Text>
+          <View style={[styles.statBox, styles.statBoxLive]}>
+            <Text style={[styles.statValue, styles.statValueLive]}>{formatPaceFromSecPerKm(currentPaceSecPerKm).replace(' /km', '')}</Text>
+            <Text style={[styles.statLabel, styles.statLabelLive]}>pace now /km</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{etaSeconds != null ? formatDuration(etaSeconds) : '—'}</Text>
@@ -241,15 +241,27 @@ const styles = StyleSheet.create({
     minWidth: 88,
     ...cardShadow,
   },
+  statBoxLive: {
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.textPrimary,
   },
+  statValueLive: {
+    fontSize: 22,
+    color: colors.accent,
+  },
   statLabel: {
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  statLabelLive: {
+    color: colors.accent,
+    fontWeight: '600',
   },
   resultTitle: {
     fontSize: 28,

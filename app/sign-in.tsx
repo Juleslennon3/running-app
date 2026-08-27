@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useState } from 'react'
 import {
@@ -20,7 +21,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [message, setMessage] = useState('')
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login')
 
   async function signUp() {
     console.log("SIGNUP BUTTON PRESSED")
@@ -68,6 +69,16 @@ export default function SignInScreen() {
     }
   }
 
+  async function sendResetEmail() {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: Linking.createURL('reset-password'),
+    })
+
+    console.log("RESET EMAIL ERROR:", error)
+
+    setMessage(error ? error.message : 'Check your email for a reset link.')
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -81,24 +92,26 @@ export default function SignInScreen() {
         <Text style={styles.logo}>RUN CLUB</Text>
         <Text style={styles.tagline}>Race your friends. Track every mile.</Text>
 
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[styles.toggleTab, mode === 'login' && styles.toggleTabActive]}
-            onPress={() => setMode('login')}
-          >
-            <Text style={[styles.toggleText, mode === 'login' && styles.toggleTextActive]}>
-              Log in
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleTab, mode === 'signup' && styles.toggleTabActive]}
-            onPress={() => setMode('signup')}
-          >
-            <Text style={[styles.toggleText, mode === 'signup' && styles.toggleTextActive]}>
-              Sign up
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {mode !== 'reset' && (
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleTab, mode === 'login' && styles.toggleTabActive]}
+              onPress={() => setMode('login')}
+            >
+              <Text style={[styles.toggleText, mode === 'login' && styles.toggleTextActive]}>
+                Log in
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleTab, mode === 'signup' && styles.toggleTabActive]}
+              onPress={() => setMode('signup')}
+            >
+              <Text style={[styles.toggleText, mode === 'signup' && styles.toggleTextActive]}>
+                Sign up
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {mode === 'signup' && (
           <TextInput
@@ -121,22 +134,36 @@ export default function SignInScreen() {
           keyboardType="email-address"
         />
 
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor={colors.textSecondary}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-        />
+        {mode !== 'reset' && (
+          <TextInput
+            placeholder="Password"
+            placeholderTextColor={colors.textSecondary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+          />
+        )}
 
-        <TouchableOpacity onPress={mode === 'login' ? logIn : signUp}>
+        {mode === 'login' && (
+          <TouchableOpacity onPress={() => { setMode('reset'); setMessage('') }}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity onPress={mode === 'login' ? logIn : mode === 'signup' ? signUp : sendResetEmail}>
           <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>
-              {mode === 'login' ? 'Log in' : 'Create account'}
+              {mode === 'login' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
+
+        {mode === 'reset' && (
+          <TouchableOpacity onPress={() => { setMode('login'); setMessage('') }}>
+            <Text style={styles.forgotText}>Back to log in</Text>
+          </TouchableOpacity>
+        )}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -231,5 +258,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     textAlign: 'center',
+  },
+  forgotText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 16,
   },
 })

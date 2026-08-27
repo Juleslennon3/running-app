@@ -63,15 +63,19 @@ export function ClubBody({
   clubId,
   myClubs,
   onSwitchClub,
+  onLeave,
 }: {
   clubId: string | number
   myClubs: { id: any; name: string }[]
   onSwitchClub: (clubId: any) => void
+  onLeave?: () => void
 }) {
   const router = useRouter()
   const { session } = useSession()
 
   const [clubName, setClubName] = useState('')
+  const [clubLocation, setClubLocation] = useState<string | null>(null)
+  const [clubDescription, setClubDescription] = useState<string | null>(null)
   const [clubCreatedAt, setClubCreatedAt] = useState<string | null>(null)
   const [clubCreatedBy, setClubCreatedBy] = useState<string | null>(null)
   const [members, setMembers] = useState<any[]>([])
@@ -99,6 +103,8 @@ export function ClubBody({
   const [workoutDistancePerRep, setWorkoutDistancePerRep] = useState('2')
   const [workoutRestSeconds, setWorkoutRestSeconds] = useState('90')
   const [workoutNotes, setWorkoutNotes] = useState('')
+  const [leaveConfirmVisible, setLeaveConfirmVisible] = useState(false)
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false)
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<Set<string>>(new Set())
   const [workoutMessage, setWorkoutMessage] = useState('')
 
@@ -115,7 +121,7 @@ export function ClubBody({
 
     const { data: club, error: clubError } = await supabase
       .from('clubs')
-      .select('name, created_at, created_by')
+      .select('name, location, description, created_at, created_by')
       .eq('id', clubId)
       .single()
 
@@ -124,6 +130,8 @@ export function ClubBody({
 
     if (!clubError && club) {
       setClubName(club.name)
+      setClubLocation(club.location)
+      setClubDescription(club.description)
       setClubCreatedAt(club.created_at)
       setClubCreatedBy(club.created_by)
     }
@@ -408,6 +416,49 @@ export function ClubBody({
     }
   }
 
+  async function removeMember(userId: string) {
+    const { error } = await supabase.rpc('remove_club_member', {
+      p_club_id: clubId,
+      p_user_id: userId,
+    })
+
+    console.log("REMOVE CLUB MEMBER ERROR:", error)
+
+    if (!error) {
+      fetchClubAndMembers()
+    }
+  }
+
+  async function leaveClub() {
+    const { error } = await supabase
+      .from('club_members')
+      .delete()
+      .eq('club_id', clubId)
+      .eq('user_id', session?.user.id)
+
+    console.log("LEAVE CLUB ERROR:", error)
+
+    setLeaveConfirmVisible(false)
+
+    if (!error) {
+      fetchClubAndMembers()
+      onLeave?.()
+    }
+  }
+
+  async function deleteClub() {
+    const { error } = await supabase.rpc('archive_club', { p_club_id: clubId })
+
+    console.log("ARCHIVE CLUB ERROR:", error)
+
+    setDeleteConfirmVisible(false)
+    setCoachModalVisible(false)
+
+    if (!error) {
+      onLeave?.()
+    }
+  }
+
   function medalStyle(rank: number) {
     if (rank === 0) return styles.rankGold
     if (rank === 1) return styles.rankSilver
@@ -491,7 +542,7 @@ export function ClubBody({
             {isCreator && (
               <TouchableOpacity style={styles.switcherButton} onPress={() => setCoachModalVisible(true)}>
                 <MaterialIcons name="military-tech" size={16} color={colors.textPrimary} />
-                <Text style={styles.switcherButtonText} numberOfLines={1}>Coaches</Text>
+                <Text style={styles.switcherButtonText} numberOfLines={1}>Manage club</Text>
               </TouchableOpacity>
             )}
             {myClubs.length > 1 && (
@@ -500,14 +551,24 @@ export function ClubBody({
                 <MaterialIcons name="unfold-more" size={16} color={colors.textPrimary} />
               </TouchableOpacity>
             )}
+            {isMember && (
+              <TouchableOpacity
+                style={styles.switcherButton}
+                onPress={() => setLeaveConfirmVisible(true)}
+                accessibilityLabel="Leave club"
+              >
+                <MaterialIcons name="logout" size={16} color={colors.danger} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
         <Text style={styles.clubTitle}>{clubName || 'Club'}</Text>
         <Text style={styles.clubSubtitle}>
-          {members.length} member{members.length === 1 ? '' : 's'}
+          {clubLocation ? `${clubLocation} · ` : ''}{members.length} member{members.length === 1 ? '' : 's'}
           {clubCreatedAt ? ` · Est. ${new Date(clubCreatedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}` : ''}
         </Text>
+        {clubDescription ? <Text style={styles.clubDescription}>{clubDescription}</Text> : null}
 
         {isMember && (
           <View style={styles.statsRow}>
@@ -826,27 +887,84 @@ export function ClubBody({
           style={styles.modalOverlay}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Manage coaches</Text>
-            <Text style={styles.modalSubtitle}>Coaches can assign training sessions to club members.</Text>
-            {members.map((member) => {
-              const memberIsCoach = member.role === 'coach'
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Manage club</Text>
+              <Text style={styles.modalSubtitle}>Coaches can assign training sessions to club members.</Text>
+              {members.map((member) => {
+                const memberIsCoach = member.role === 'coach'
+                const isThisMemberCreator = member.id === clubCreatedBy
 
-              return (
-                <View key={member.id} style={styles.coachRow}>
-                  <Text style={styles.switcherRowText}>{member.username}</Text>
-                  <TouchableOpacity
-                    style={[styles.coachToggle, memberIsCoach && styles.coachToggleActive]}
-                    onPress={() => toggleCoach(member.id, memberIsCoach)}
-                  >
-                    <Text style={[styles.coachToggleText, memberIsCoach && styles.coachToggleTextActive]}>
-                      {memberIsCoach ? 'Coach' : 'Make coach'}
-                    </Text>
+                return (
+                  <View key={member.id} style={styles.coachRow}>
+                    <Text style={styles.switcherRowText} numberOfLines={1}>{member.username}</Text>
+                    <TouchableOpacity
+                      style={[styles.coachToggle, memberIsCoach && styles.coachToggleActive]}
+                      onPress={() => toggleCoach(member.id, memberIsCoach)}
+                    >
+                      <Text style={[styles.coachToggleText, memberIsCoach && styles.coachToggleTextActive]}>
+                        {memberIsCoach ? 'Coach' : 'Make coach'}
+                      </Text>
+                    </TouchableOpacity>
+                    {!isThisMemberCreator && (
+                      <TouchableOpacity
+                        style={styles.removeMemberButton}
+                        onPress={() => removeMember(member.id)}
+                        accessibilityLabel={`Remove ${member.username}`}
+                      >
+                        <MaterialIcons name="close" size={16} color={colors.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )
+              })}
+
+              <View style={styles.dangerZone}>
+                {!deleteConfirmVisible ? (
+                  <TouchableOpacity style={styles.dangerButton} onPress={() => setDeleteConfirmVisible(true)}>
+                    <Text style={styles.dangerButtonText}>Delete club</Text>
                   </TouchableOpacity>
-                </View>
-              )
-            })}
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setCoachModalVisible(false)}>
-              <Text style={styles.cancelButtonText}>Close</Text>
+                ) : (
+                  <View>
+                    <Text style={styles.modalSubtitle}>
+                      This closes the club for everyone. Members keep their race history, but the club disappears from discovery and everyone&apos;s club list.
+                    </Text>
+                    <TouchableOpacity style={styles.dangerButton} onPress={deleteClub}>
+                      <Text style={styles.dangerButtonText}>Confirm delete</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteConfirmVisible(false)}>
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setCoachModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Close</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={leaveConfirmVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setLeaveConfirmVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Leave {clubName || 'this club'}?</Text>
+            <Text style={styles.modalSubtitle}>
+              {isCreator
+                ? "You created this club — leaving won't delete it or transfer ownership to anyone else."
+                : "You'll lose access to this club's feed, races, and leaderboard."}
+            </Text>
+            <TouchableOpacity style={styles.dangerButton} onPress={leaveClub}>
+              <Text style={styles.dangerButtonText}>Leave club</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setLeaveConfirmVisible(false)}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -1005,6 +1123,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  clubDescription: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 10,
+    lineHeight: 19,
   },
   statsRow: {
     flexDirection: 'row',
@@ -1236,4 +1360,27 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
   cancelButton: { alignItems: 'center', paddingVertical: 10 },
   cancelButtonText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  removeMemberButton: {
+    marginLeft: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2e1616',
+  },
+  dangerZone: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.border,
+  },
+  dangerButton: {
+    backgroundColor: '#2e1616',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dangerButtonText: { color: colors.danger, fontWeight: 'bold', fontSize: 14 },
 })

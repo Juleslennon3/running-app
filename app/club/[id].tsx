@@ -36,6 +36,7 @@ export default function ClubDetailScreen() {
       .from('clubs')
       .select('id, name')
       .in('id', clubIds)
+      .is('archived_at', null)
 
     console.log("MY CLUBS ERROR:", clubsError)
 
@@ -50,6 +51,7 @@ export default function ClubDetailScreen() {
         clubId={id as string}
         myClubs={myClubs}
         onSwitchClub={(newClubId) => router.replace(`/club/${newClubId}`)}
+        onLeave={() => router.replace('/(tabs)/clubs')}
       />
     </ScrollView>
   )

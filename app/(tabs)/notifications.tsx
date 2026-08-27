@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { useSession } from '../../lib/auth-context'
 import { supabase } from '../../lib/supabase'
@@ -10,6 +10,8 @@ export default function NotificationsScreen() {
   const router = useRouter()
   const { session } = useSession()
   const [notifications, setNotifications] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     if (session) {
@@ -18,6 +20,9 @@ export default function NotificationsScreen() {
   }, [session])
 
   async function fetchNotifications() {
+    setLoading(true)
+    setLoadError('')
+
     const { data, error } = await supabase
       .from('notifications')
       .select('id, type, is_read, created_at, race_id, workout_id, profiles!notifications_actor_id_fkey(username), races(name), workouts(name)')
@@ -30,7 +35,11 @@ export default function NotificationsScreen() {
     if (!error && data) {
       setNotifications(data)
       markAllRead()
+    } else {
+      setLoadError("Couldn't load notifications. Pull to refresh or try again shortly.")
     }
+
+    setLoading(false)
   }
 
   async function markAllRead() {
@@ -77,7 +86,9 @@ export default function NotificationsScreen() {
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
       <Text style={styles.title}>Notifications</Text>
 
-      {notifications.length === 0 && (
+      {loading && <ActivityIndicator color={colors.accent} style={styles.loadingIndicator} />}
+      {!loading && loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+      {!loading && !loadError && notifications.length === 0 && (
         <Text style={styles.emptyText}>No notifications yet.</Text>
       )}
       {notifications.map((notification) => (
@@ -124,6 +135,14 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textSecondary,
     fontSize: 13,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  loadingIndicator: {
+    marginTop: 20,
   },
   notificationCard: {
     flexDirection: 'row',

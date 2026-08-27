@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,6 +30,8 @@ export default function ExploreScreen() {
 
   // Races
   const [openRaces, setOpenRaces] = useState<any[]>([])
+  const [racesLoading, setRacesLoading] = useState(true)
+  const [racesError, setRacesError] = useState('')
 
   // People
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -59,6 +62,9 @@ export default function ExploreScreen() {
   }, [searchQuery, category, session])
 
   async function fetchOpenRaces() {
+    setRacesLoading(true)
+    setRacesError('')
+
     const { data, error } = await supabase
       .from('races')
       .select('*, clubs(name)')
@@ -70,7 +76,11 @@ export default function ExploreScreen() {
 
     if (!error && data) {
       setOpenRaces(data)
+    } else {
+      setRacesError("Couldn't load races. Pull to refresh or try again shortly.")
     }
+
+    setRacesLoading(false)
   }
 
   async function fetchMyFollowingIds() {
@@ -163,7 +173,11 @@ export default function ExploreScreen() {
 
       {category === 'races' && (
         <>
-          {filteredRaces.length === 0 && (
+          {racesLoading && (
+            <ActivityIndicator color={colors.accent} style={styles.loadingIndicator} />
+          )}
+          {!racesLoading && racesError ? <Text style={styles.errorText}>{racesError}</Text> : null}
+          {!racesLoading && !racesError && filteredRaces.length === 0 && (
             <Text style={styles.emptyText}>No open races found.</Text>
           )}
           {filteredRaces.map((race) => (
@@ -249,6 +263,14 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textSecondary,
     fontSize: 13,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  loadingIndicator: {
+    marginTop: 20,
   },
   raceCard: {
     backgroundColor: colors.card,

@@ -23,6 +23,13 @@ export default function PracticePickerScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <TouchableOpacity style={styles.generateCard} onPress={() => router.push('/generate-race')}>
+        <Text style={styles.generateCardTitle}>Generate a race</Text>
+        <Text style={styles.generateCardSubtitle}>
+          Build a simulated field of any size and ability level — race hundreds of people at once.
+        </Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -34,4 +41,15 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: { backgroundColor: colors.card, borderRadius: 20, paddingVertical: 14, paddingHorizontal: 22, ...cardShadow },
   chipText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  generateCard: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 28,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    ...cardShadow,
+  },
+  generateCardTitle: { color: colors.accent, fontSize: 17, fontWeight: '700' },
+  generateCardSubtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 6, lineHeight: 19 },
 })

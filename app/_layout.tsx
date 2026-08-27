@@ -68,6 +68,8 @@ return (
 <Stack.Screen name="practice/index" options={{ title: 'Race Offline', headerShown: true }} />
 <Stack.Screen name="practice/[distance]/index" options={{ title: 'Practice', headerShown: true }} />
 <Stack.Screen name="ladder/[botId]/track" options={{ headerShown: false }} />
+<Stack.Screen name="generate-race/index" options={{ title: 'Generate a Race', headerShown: true }} />
+<Stack.Screen name="generate-race/track" options={{ headerShown: false }} />
 <Stack.Screen name="workout/[id]/index" options={{ title: 'Workout', headerShown: true }} />
 <Stack.Screen name="workout/[id]/track" options={{ headerShown: false }} />
 <Stack.Screen name="user/[id]/index" options={{ title: 'Profile', headerShown: true }} />
@@ -77,6 +79,7 @@ return (
 <Stack.Protected guard={!session}>
 <Stack.Screen name="sign-in" options={{ headerShown: false }} />
 </Stack.Protected>
+<Stack.Screen name="reset-password" options={{ headerShown: false }} />
 </Stack>
 <StatusBar style="auto" />
 </ThemeProvider>

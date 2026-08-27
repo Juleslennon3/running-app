@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 
 import { useSession } from '../../lib/auth-context'
+import { formatDuration } from '../../lib/format'
 import { getLevelLabel } from '../../lib/level'
 import { supabase } from '../../lib/supabase'
 import { avatarColors, cardShadow, colors, sectionLabel } from '../../lib/theme'
@@ -25,6 +26,8 @@ export default function ProfileScreen() {
   const [totalDistance, setTotalDistance] = useState(0)
   const [racesWon, setRacesWon] = useState(0)
   const [formResults, setFormResults] = useState<{ raceId: any; won: boolean }[]>([])
+  const [personalBests, setPersonalBests] = useState<{ distance: number; seconds: number }[]>([])
+  const [raceRanks, setRaceRanks] = useState<{ [raceId: string]: { rank: number; total: number } }>({})
 
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
@@ -100,7 +103,7 @@ export default function ProfileScreen() {
   async function fetchMyRacesAndStats() {
     const { data: participations, error } = await supabase
       .from('race_participants')
-      .select('distance_km, race_id, races(id, name, end_date, target_distance_km)')
+      .select('distance_km, duration_seconds, race_id, races(id, name, end_date, target_distance_km)')
       .eq('user_id', session?.user.id)
 
     console.log("MY RACE PARTICIPATIONS:", participations)
@@ -108,19 +111,42 @@ export default function ProfileScreen() {
 
     if (error || !participations) return
 
-    setMyRaces(participations)
+    const withDnf = (participations as any[]).map((row) => ({
+      ...row,
+      dnf:
+        row.duration_seconds !== null &&
+        !!row.races?.target_distance_km &&
+        (row.distance_km ?? 0) < row.races.target_distance_km,
+    }))
 
-    const total = participations.reduce((sum, row: any) => {
-      return sum + (row.distance_km ?? 0)
-    }, 0)
+    setMyRaces(withDnf)
+
+    const total = withDnf.reduce((sum, row) => sum + (row.distance_km ?? 0), 0)
     setTotalDistance(total)
 
-    const completedRaces = (participations as any[])
+    const bestsByDistance = new Map<number, number>()
+    for (const row of withDnf) {
+      if (row.duration_seconds !== null && !row.dnf && row.races?.target_distance_km) {
+        const distance = row.races.target_distance_km
+        const existing = bestsByDistance.get(distance)
+        if (existing === undefined || row.duration_seconds < existing) {
+          bestsByDistance.set(distance, row.duration_seconds)
+        }
+      }
+    }
+    setPersonalBests(
+      Array.from(bestsByDistance.entries())
+        .map(([distance, seconds]) => ({ distance, seconds }))
+        .sort((a, b) => a.distance - b.distance)
+    )
+
+    const completedRaces = withDnf
       .filter((row) => row.races && new Date(row.races.end_date) < new Date())
       .sort((a, b) => new Date(a.races.end_date).getTime() - new Date(b.races.end_date).getTime())
 
     let wins = 0
     const results: { raceId: any; won: boolean }[] = []
+    const ranks: { [raceId: string]: { rank: number; total: number } } = {}
 
     for (const row of completedRaces) {
       const race = row.races
@@ -138,13 +164,18 @@ export default function ProfileScreen() {
 
       const topFinisher = finishers[0]
       const won = !!(topFinisher && topFinisher.user_id === session?.user.id)
+      const myIndex = finishers.findIndex((p: any) => p.user_id === session?.user.id)
 
       if (won) wins++
       results.push({ raceId: race.id, won })
+      if (myIndex >= 0) {
+        ranks[race.id] = { rank: myIndex + 1, total: finishers.length }
+      }
     }
 
     setRacesWon(wins)
     setFormResults(results.slice(-5))
+    setRaceRanks(ranks)
   }
 
   if (!session) return null
@@ -219,6 +250,18 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {personalBests.length > 0 && (
+        <View style={styles.pbCard}>
+          <Text style={styles.formTitle}>Personal bests</Text>
+          {personalBests.map((pb) => (
+            <View key={pb.distance} style={styles.pbRow}>
+              <Text style={styles.pbDistance}>{pb.distance} km</Text>
+              <Text style={styles.pbTime}>{formatDuration(pb.seconds)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {formResults.length > 0 && (
         <View style={styles.formCard}>
           <Text style={styles.formTitle}>Recent form</Text>
@@ -254,23 +297,36 @@ export default function ProfileScreen() {
       {myRaces.length === 0 && (
         <Text style={styles.emptyText}>You haven&apos;t joined any races yet.</Text>
       )}
-      {myRaces.map((row: any, index) => (
-        <TouchableOpacity
-          key={index}
-          style={styles.rowCard}
-          onPress={() => router.push({ pathname: '/race/[id]', params: { id: row.race_id } })}
-        >
-          <View style={styles.rowIcon}>
-            <Text style={styles.rowIconText}>{row.races?.name?.[0]?.toUpperCase() ?? '?'}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowText}>{row.races?.name || 'Untitled race'}</Text>
-            <Text style={styles.rowSubtext}>
-              {row.distance_km !== null ? `${row.distance_km} km` : 'No result logged'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      ))}
+      {myRaces
+        .slice()
+        .sort((a: any, b: any) => new Date(b.races?.end_date ?? 0).getTime() - new Date(a.races?.end_date ?? 0).getTime())
+        .map((row: any, index) => {
+          const rank = raceRanks[row.race_id]
+          return (
+            <TouchableOpacity
+              key={index}
+              style={styles.rowCard}
+              onPress={() => router.push({ pathname: '/race/[id]', params: { id: row.race_id } })}
+            >
+              <View style={styles.rowIcon}>
+                <Text style={styles.rowIconText}>{row.races?.name?.[0]?.toUpperCase() ?? '?'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowText}>{row.races?.name || 'Untitled race'}</Text>
+                <Text style={styles.rowSubtext}>
+                  {row.races?.end_date ? `${new Date(row.races.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ` : ''}
+                  {row.dnf
+                    ? 'DNF'
+                    : row.duration_seconds !== null
+                      ? `${formatDuration(row.duration_seconds)}${rank ? ` · ${rank.rank}/${rank.total}` : ''}`
+                      : row.distance_km !== null
+                        ? `${row.distance_km} km`
+                        : 'No result logged'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )
+        })}
     </ScrollView>
   )
 }
@@ -432,6 +488,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 5,
+  },
+  pbCard: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    ...cardShadow,
+  },
+  pbRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.border,
+  },
+  pbDistance: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  pbTime: {
+    fontSize: 15,
+    color: colors.accent,
+    fontWeight: 'bold',
   },
   formCard: {
     backgroundColor: colors.card,
